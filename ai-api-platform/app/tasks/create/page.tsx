@@ -48,7 +48,7 @@ function CreateTaskContent() {
         description: formData.description,
         language: formData.language || 'python',
         framework: formData.framework || 'fastapi',
-        database: formData.database || 'sqlite',
+        database: formData.database || 'mysql',
         features,
       }
       

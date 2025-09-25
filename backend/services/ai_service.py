@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class AICodeGenerationService:
-    """AI代码生成服务"""
+    """增强版AI代码生成服务"""
     
     def __init__(self, api_key: str = None):
         """初始化AI服务
@@ -22,6 +22,17 @@ class AICodeGenerationService:
         self.api_key = api_key or os.getenv('OPENROUTER_API_KEY')
         self.base_url = os.getenv('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
         self.model = os.getenv('AI_MODEL', 'anthropic/claude-3-5-sonnet-20241022')
+        
+        # 支持的AI功能类型
+        self.supported_functions = {
+            'code_generation': '代码生成',
+            'code_review': '代码审查',
+            'bug_fix': '问题修复',
+            'code_optimization': '代码优化',
+            'test_generation': '测试用例生成',
+            'documentation': '文档生成',
+            'refactoring': '代码重构'
+        }
         
         if not self.api_key:
             logger.warning("未找到OpenRouter API密钥，请检查环境变量OPENROUTER_API_KEY")
@@ -82,6 +93,177 @@ class AICodeGenerationService:
             self._add_task_log(task.id, task.status, error_msg, db)
             db.commit()
             return False, None, None, error_msg
+    
+    async def review_code(
+        self, 
+        code: str, 
+        task_description: str = "",
+        db: Session = None
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """代码审查功能
+        
+        Args:
+            code: 待审查的代码
+            task_description: 任务描述
+            db: 数据库会话
+            
+        Returns:
+            Tuple[success, review_result, error_message]
+        """
+        try:
+            prompt = self._build_code_review_prompt(code, task_description)
+            response = await self._call_openai_api(prompt)
+            
+            if response:
+                logger.info("代码审查完成")
+                return True, response, None
+            else:
+                error_msg = "代码审查失败：无响应"
+                return False, None, error_msg
+                
+        except Exception as e:
+            error_msg = f"代码审查异常：{str(e)}"
+            logger.error(error_msg)
+            return False, None, error_msg
+    
+    async def fix_code(
+        self, 
+        code: str, 
+        error_message: str,
+        task_description: str = "",
+        db: Session = None
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """代码修复功能
+        
+        Args:
+            code: 有问题的代码
+            error_message: 错误信息
+            task_description: 任务描述
+            db: 数据库会话
+            
+        Returns:
+            Tuple[success, fixed_code, error_message]
+        """
+        try:
+            prompt = self._build_code_fix_prompt(code, error_message, task_description)
+            response = await self._call_openai_api(prompt)
+            
+            if response:
+                fixed_code = self._extract_code_from_response(response)
+                logger.info("代码修复完成")
+                return True, fixed_code, None
+            else:
+                error_msg = "代码修复失败：无响应"
+                return False, None, error_msg
+                
+        except Exception as e:
+            error_msg = f"代码修复异常：{str(e)}"
+            logger.error(error_msg)
+            return False, None, error_msg
+    
+    async def optimize_code(
+        self, 
+        code: str, 
+        optimization_type: str = "performance",
+        task_description: str = "",
+        db: Session = None
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """代码优化功能
+        
+        Args:
+            code: 待优化的代码
+            optimization_type: 优化类型 (performance, readability, security)
+            task_description: 任务描述
+            db: 数据库会话
+            
+        Returns:
+            Tuple[success, optimized_code, error_message]
+        """
+        try:
+            prompt = self._build_code_optimization_prompt(code, optimization_type, task_description)
+            response = await self._call_openai_api(prompt)
+            
+            if response:
+                optimized_code = self._extract_code_from_response(response)
+                logger.info(f"代码优化完成 - 类型: {optimization_type}")
+                return True, optimized_code, None
+            else:
+                error_msg = "代码优化失败：无响应"
+                return False, None, error_msg
+                
+        except Exception as e:
+            error_msg = f"代码优化异常：{str(e)}"
+            logger.error(error_msg)
+            return False, None, error_msg
+    
+    async def generate_tests(
+        self, 
+        code: str, 
+        test_type: str = "unit",
+        task_description: str = "",
+        db: Session = None
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """生成测试用例
+        
+        Args:
+            code: 待测试的代码
+            test_type: 测试类型 (unit, integration, api)
+            task_description: 任务描述
+            db: 数据库会话
+            
+        Returns:
+            Tuple[success, test_code, error_message]
+        """
+        try:
+            prompt = self._build_test_generation_prompt(code, test_type, task_description)
+            response = await self._call_openai_api(prompt)
+            
+            if response:
+                test_code = self._extract_code_from_response(response)
+                logger.info(f"测试用例生成完成 - 类型: {test_type}")
+                return True, test_code, None
+            else:
+                error_msg = "测试用例生成失败：无响应"
+                return False, None, error_msg
+                
+        except Exception as e:
+            error_msg = f"测试用例生成异常：{str(e)}"
+            logger.error(error_msg)
+            return False, None, error_msg
+    
+    async def generate_documentation(
+        self, 
+        code: str, 
+        doc_type: str = "api",
+        task_description: str = "",
+        db: Session = None
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """生成文档
+        
+        Args:
+            code: 代码
+            doc_type: 文档类型 (api, readme, comments)
+            task_description: 任务描述
+            db: 数据库会话
+            
+        Returns:
+            Tuple[success, documentation, error_message]
+        """
+        try:
+            prompt = self._build_documentation_prompt(code, doc_type, task_description)
+            response = await self._call_openai_api(prompt)
+            
+            if response:
+                logger.info(f"文档生成完成 - 类型: {doc_type}")
+                return True, response, None
+            else:
+                error_msg = "文档生成失败：无响应"
+                return False, None, error_msg
+                
+        except Exception as e:
+            error_msg = f"文档生成异常：{str(e)}"
+            logger.error(error_msg)
+            return False, None, error_msg
     
     def _build_prompt(self, task: Task) -> str:
         """构建AI提示词"""
@@ -169,6 +351,165 @@ class AICodeGenerationService:
 ```
 """
         return prompt
+    
+    def _build_code_review_prompt(self, code: str, task_description: str = "") -> str:
+        """构建代码审查提示词"""
+        prompt = f"""
+你是一名资深的代码审查专家，请对以下代码进行全面审查：
+
+任务描述：{task_description}
+
+代码内容：
+```
+{code}
+```
+
+请从以下几个方面进行审查：
+1. 代码质量和可读性
+2. 性能优化建议
+3. 安全性问题
+4. 最佳实践遵循情况
+5. 潜在的bug和问题
+6. 代码结构和设计模式
+
+请提供详细的审查报告，包括具体的改进建议。
+"""
+        return prompt
+    
+    def _build_code_fix_prompt(self, code: str, error_message: str, task_description: str = "") -> str:
+        """构建代码修复提示词"""
+        prompt = f"""
+你是一名专业的代码调试专家，请修复以下代码中的问题：
+
+任务描述：{task_description}
+
+错误信息：
+{error_message}
+
+有问题的代码：
+```
+{code}
+```
+
+请提供修复后的完整代码，确保：
+1. 修复所有错误
+2. 保持原有功能不变
+3. 遵循最佳实践
+4. 添加必要的错误处理
+5. 包含详细的中文注释
+
+请只返回修复后的代码，不要包含其他说明。
+"""
+        return prompt
+    
+    def _build_code_optimization_prompt(self, code: str, optimization_type: str, task_description: str = "") -> str:
+        """构建代码优化提示词"""
+        optimization_focus = {
+            "performance": "性能优化，包括算法效率、内存使用、执行速度等",
+            "readability": "可读性优化，包括代码结构、命名规范、注释完善等",
+            "security": "安全性优化，包括输入验证、权限控制、数据保护等"
+        }
+        
+        focus = optimization_focus.get(optimization_type, "综合优化")
+        
+        prompt = f"""
+你是一名代码优化专家，请对以下代码进行{focus}：
+
+任务描述：{task_description}
+
+原始代码：
+```
+{code}
+```
+
+优化要求：
+1. 重点关注{focus}
+2. 保持原有功能完整性
+3. 遵循Python最佳实践
+4. 添加详细的中文注释
+5. 确保代码的可维护性
+
+请提供优化后的完整代码。
+"""
+        return prompt
+    
+    def _build_test_generation_prompt(self, code: str, test_type: str, task_description: str = "") -> str:
+        """构建测试用例生成提示词"""
+        test_focus = {
+            "unit": "单元测试，测试单个函数或方法",
+            "integration": "集成测试，测试模块间的交互",
+            "api": "API测试，测试接口的输入输出"
+        }
+        
+        focus = test_focus.get(test_type, "综合测试")
+        
+        prompt = f"""
+你是一名测试工程师，请为以下代码生成{focus}：
+
+任务描述：{task_description}
+
+待测试代码：
+```
+{code}
+```
+
+测试要求：
+1. 使用pytest框架
+2. 覆盖正常情况和异常情况
+3. 包含边界值测试
+4. 添加详细的中文注释
+5. 确保测试的完整性和可靠性
+
+请生成完整的测试代码。
+"""
+        return prompt
+    
+    def _build_documentation_prompt(self, code: str, doc_type: str, task_description: str = "") -> str:
+        """构建文档生成提示词"""
+        doc_focus = {
+            "api": "API文档，包括接口说明、参数、返回值等",
+            "readme": "README文档，包括项目介绍、使用方法、安装说明等",
+            "comments": "代码注释，为代码添加详细的中文注释"
+        }
+        
+        focus = doc_focus.get(doc_type, "技术文档")
+        
+        prompt = f"""
+你是一名技术文档专家，请为以下代码生成{focus}：
+
+任务描述：{task_description}
+
+代码内容：
+```
+{code}
+```
+
+文档要求：
+1. 使用中文编写
+2. 结构清晰，易于理解
+3. 包含具体的使用示例
+4. 详细说明参数和返回值
+5. 包含注意事项和最佳实践
+
+请生成完整的文档内容。
+"""
+        return prompt
+    
+    def _extract_code_from_response(self, response: str) -> str:
+        """从AI响应中提取代码"""
+        # 尝试提取代码块
+        import re
+        
+        # 匹配```python 或 ``` 包围的代码块
+        code_pattern = r'```(?:python)?\s*\n(.*?)\n```'
+        matches = re.findall(code_pattern, response, re.DOTALL)
+        
+        if matches:
+            # 返回第一个代码块
+            return matches[0].strip()
+        
+        # 如果没有找到代码块，返回原始响应
+        return response.strip()
     
     def _load_development_guide(self) -> str:
         """加载API开发指南"""

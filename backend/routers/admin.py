@@ -109,6 +109,40 @@ async def get_all_tasks(
         size=size
     )
 
+@router.get("/tasks/{task_id}", response_model=TaskResponse, summary="获取任务详情")
+async def get_task_by_admin(
+    task_id: int,
+    admin_user: User = Depends(verify_admin),
+    db: Session = Depends(get_db)
+):
+    """获取指定任务的详细信息（管理员）"""
+    task = db.query(Task).join(User).filter(Task.id == task_id).first()
+    
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="任务不存在"
+        )
+    
+    return TaskResponse(
+        id=task.id,
+        user_id=task.user_id,
+        title=task.title,
+        description=task.description,
+        input_params=task.input_params,
+        output_params=task.output_params,
+        status=task.status,
+        branch_name=task.branch_name,
+        generated_code=task.generated_code,
+        test_cases=task.test_cases,
+        test_result_image=task.test_result_image,
+        test_url=task.test_url,
+        admin_comment=task.admin_comment,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+        user=task.user
+    )
+
 @router.put("/tasks/{task_id}", response_model=TaskResponse, summary="更新任务状态")
 async def update_task_status(
     task_id: int,

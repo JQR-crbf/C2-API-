@@ -64,7 +64,7 @@ function APITestingContent() {
       if (completedTasks.length > 0) {
         setSelectedTask(completedTasks[0])
         // 根据任务设置默认的测试URL
-        setUrl(`http://localhost:8000/api/auth/login`)
+        setUrl(`http://localhost:8080/api/auth/login`)
       }
     } catch (error) {
       console.error('Failed to load tasks:', error)
@@ -98,7 +98,7 @@ function APITestingContent() {
       ]
       setUserTasks(mockTasks)
       setSelectedTask(mockTasks[0])
-      setUrl('http://localhost:8000/api/auth/login')
+      setUrl('http://localhost:8080/api/auth/login')
     }
   }
 
@@ -126,21 +126,21 @@ function APITestingContent() {
       setSelectedTask(task)
       // 根据任务类型设置不同的测试端点
       if ((task.name || task.title).includes('用户')) {
-        setUrl('http://localhost:8000/api/auth/login')
+        setUrl('http://localhost:8080/api/auth/login')
         setMethod('POST')
         setRequestBody(JSON.stringify(sampleData?.login_request || {
           username: 'admin',
           password: 'admin123'
         }, null, 2))
       } else if ((task.name || task.title).includes('认证') || (task.name || task.title).includes('登录')) {
-        setUrl('http://localhost:8000/api/auth/login')
+        setUrl('http://localhost:8080/api/auth/login')
         setMethod('POST')
         setRequestBody(JSON.stringify(sampleData?.login_request || {
           username: 'admin',
           password: 'admin123'
         }, null, 2))
       } else {
-        setUrl('http://localhost:8000/health')
+        setUrl('http://localhost:8080/health')
         setMethod('GET')
       }
     }
@@ -307,7 +307,7 @@ function APITestingContent() {
                       <Input 
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
-                        placeholder="http://localhost:8000/api/v1/endpoint"
+                        placeholder="http://localhost:8080/api/v1/endpoint"
                         className="bg-input border-border"
                       />
                     </div>

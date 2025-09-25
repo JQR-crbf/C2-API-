@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from database import Base, engine
-from models import User, Task, Notification, TaskLog, UserRole
+from models import User, Task, Notification, TaskLog, UserRole, DeploymentSession, DeploymentStep
 from werkzeug.security import generate_password_hash
 
 def init_database():

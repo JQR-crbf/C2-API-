@@ -12,7 +12,7 @@ import requests
 import json
 
 # 后端API地址
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "http://localhost:8080"
 
 def create_test_user():
     """创建一个测试用户"""

@@ -1,6 +1,6 @@
 // API客户端工具 - 处理所有HTTP请求和认证
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
 // 认证相关类型
 export interface LoginRequest {

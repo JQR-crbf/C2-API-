@@ -8,16 +8,133 @@
 - **用户认证系统**：支持用户注册、登录和权限管理
 - **任务管理**：用户可以提交API开发需求，系统自动处理
 - **AI代码生成**：基于用户需求自动生成FastAPI代码
+- **增强工作流程引擎**：支持15步完整流程管理，包括代码生成、测试、部署等
+- **自动化测试功能**：语法检查、单元测试、API测试和性能测试
+- **Git操作自动化**：自动分支创建、代码提交、推送等版本控制操作
+- **SSH连接管理**：安全的远程服务器连接和命令执行
 - **测试环境部署**：自动部署生成的代码到Docker测试环境
 - **管理员审核**：管理员可以审核和管理所有任务
 - **通知系统**：实时通知用户任务进度和状态变化
+- **增强用户界面**：错误处理、帮助系统、实时反馈等用户体验改进
+- **引导式部署**：提供完整的服务器连接和部署向导功能
 
 ### 技术架构
 - **前端**：Next.js 14 + React + TypeScript + Tailwind CSS
 - **后端**：FastAPI + SQLAlchemy + MySQL
-- **数据库**：MySQL（本地或远程数据库）
+- **数据库**：MySQL 8.0+（推荐本地安装）
 - **容器化**：Docker（用于测试环境部署）
-- **AI集成**：OpenAI API（可配置）
+- **AI集成**：OpenRouter API（支持多种AI模型）
+
+## 🚀 简单理解：什么是部署会话和服务器连接？
+
+### 部署会话是什么？
+**部署会话**就像是一个"工作记录本"，记录了你把AI生成的代码放到服务器上的整个过程。
+
+想象一下：
+- 你有一个AI生成的网站代码
+- 你想把这个网站放到服务器上让别人能访问
+- 部署会话就是记录这个"搬家"过程的每一步
+
+### 服务器连接是什么？
+**服务器连接**就是让你的电脑能够"远程控制"另一台电脑（服务器）。
+
+就像：
+- 你在家里的电脑上
+- 通过网络连接到公司的电脑
+- 然后可以在公司电脑上运行程序、复制文件等
+
+### 为什么需要连接数据库？
+这里的"数据库"不是指你要连接的服务器，而是指：
+- 系统需要把你的部署过程记录下来
+- 比如：连接了哪台服务器、执行了什么命令、是否成功等
+- 这些信息都保存在系统自己的数据库里
+
+### 简单来说：
+1. **部署会话** = 记录你部署代码的整个过程
+2. **服务器连接** = 让你能远程操作目标服务器
+3. **数据库连接** = 系统保存这些操作记录的地方
+
+你只需要关心：**输入服务器的IP地址、用户名、密码，系统就会帮你连接并部署代码！**
+
+## 📋 如何连接到你的服务器？
+
+### 第一步：准备服务器信息
+你需要知道以下信息：
+- **服务器地址**：比如 `192.168.1.100` 或 `myserver.com`
+- **端口号**：通常是 `22`（SSH默认端口）
+- **用户名**：比如 `root` 或 `ubuntu`
+- **认证方式**：密码或SSH密钥
+  - **密码**：你的服务器登录密码
+  - **SSH密钥**：私钥文件内容（更安全的连接方式）
+- **部署路径**：代码要放在服务器的哪个文件夹，比如 `/home/api_projects`
+
+### 🔐 SSH密钥连接（推荐）
+
+**什么是SSH密钥？**
+SSH密钥是一种更安全的服务器连接方式，比密码更安全，不容易被破解。
+
+**如何使用SSH密钥？**
+1. 从你的云服务器提供商（如华为云、阿里云）下载私钥文件
+2. 打开私钥文件，复制全部内容
+3. 在系统中选择"SSH密钥"认证方式
+4. 将私钥内容粘贴到"SSH私钥"文本框中
+
+**预设服务器配置**
+系统已预配置两台华为云服务器：
+- **服务器1 - 主平台**：113.44.82.13（运行AI API开发平台）
+- **服务器2 - API部署**：124.70.0.110（专门部署AI生成的API代码）
+
+你可以直接选择预设服务器，系统会自动填入配置信息。
+
+### 第二步：在系统中填写信息
+1. 打开任务详情页面
+2. 点击"引导部署"按钮
+3. 在弹出的"服务器配置"对话框中：
+   
+   **选择服务器：**
+   - **华为云服务器1**：选择预配置的主平台服务器
+   - **华为云服务器2**：选择预配置的API部署服务器
+   - **自定义服务器**：手动配置你自己的服务器
+   
+   **如果选择自定义服务器，需要填写：**
+   - 服务器地址：`你的服务器IP`
+   - 端口：`22`
+   - 用户名：`你的用户名`
+   - 认证方式：选择"密码"或"SSH密钥"
+     - 如果选择密码：输入服务器密码
+     - 如果选择SSH密钥：粘贴私钥文件内容
+   - 部署路径：`/home/api_projects`
+   
+4. 点击"连接服务器"按钮
+
+### 第三步：等待自动部署
+系统会自动：
+1. 连接到你的服务器
+2. 创建必要的文件夹
+3. 上传AI生成的代码
+4. 安装依赖包
+5. 启动你的API服务
+
+### 常见问题解答
+
+**Q: 我没有服务器怎么办？**
+A: 你可以：
+- 使用云服务器（如阿里云、腾讯云）
+- 使用本地虚拟机
+- 先用系统默认的测试服务器体验功能
+
+**Q: 连接失败怎么办？**
+A: 检查：
+- 服务器地址是否正确
+- 用户名和密码是否正确
+- 服务器是否开启SSH服务
+- 网络是否畅通
+
+**Q: 部署失败怎么办？**
+A: 系统会显示详细的错误信息，你可以：
+- 查看终端输出了解具体错误
+- 检查服务器权限设置
+- 确保服务器有足够的磁盘空间
 
 ## 项目结构
 
@@ -30,17 +147,29 @@ C2-API project/
 │   │   ├── tasks/            # 任务管理页面
 │   │   └── testing/          # 测试环境页面
 │   ├── components/           # 共享组件
-│   └── public/              # 静态资源
+   │   ├── ui/              # 基础UI组件
+   │   ├── enhanced-error-handler.tsx # 增强错误处理
+   │   ├── help-system.tsx  # 帮助系统
+   │   ├── real-time-feedback.tsx # 实时反馈
+   │   └── guided-deployment.tsx # 引导式部署组件
+   └── public/              # 静态资源
 ├── backend/                  # 后端项目
 │   ├── routers/             # API路由
 │   │   ├── auth.py          # 认证相关API
 │   │   ├── tasks.py         # 任务管理API
 │   │   ├── admin.py         # 管理员API
-│   │   └── notifications.py # 通知API
+│   │   ├── notifications.py # 通知API
+│   │   ├── workflow.py      # 工作流程管理API
+│   │   ├── git_router.py    # Git操作API
+│   │   ├── ai_router.py     # AI服务API
+│   │   └── test_router.py   # 自动化测试API
 │   ├── services/            # 业务服务
 │   │   ├── ai_service.py    # AI代码生成服务
 │   │   ├── test_service.py  # 测试环境服务
-│   │   └── task_processor.py # 后台任务处理器
+│   │   ├── task_processor.py # 后台任务处理器
+│   │   ├── workflow_engine.py # 工作流程引擎
+│   │   ├── git_service.py   # Git操作服务
+│   │   └── ssh_service.py   # SSH连接服务
 │   ├── models.py            # 数据库模型
 │   ├── schemas.py           # API数据模式
 │   ├── database.py          # 数据库配置
@@ -49,6 +178,33 @@ C2-API project/
 │   └── init_db.py           # 数据库初始化脚本
 └── README.md                # 项目说明文档
 ```
+
+## 最新更新
+
+### 2025年1月最新修复和改进
+
+#### ✅ 已完成的修复
+1. **数据库模型优化**：修复User模型缺少full_name字段的问题，完善API响应数据
+2. **权限管理修复**：将admin用户角色正确设置为admin，确保管理员功能正常
+3. **前端语法修复**：解决guided-deployment.tsx组件的JSX语法错误
+4. **工作流程引擎优化**：完善task_workflow_service.py中的步骤检查逻辑
+5. **数据库配置统一**：清理项目中混乱的MySQL/SQLite配置，统一使用mysql+mysqldb驱动
+6. **引导式部署功能**：完善服务器连接和部署向导功能
+7. **API路径修复**：修正前端deployment相关API调用路径不匹配问题，解决404错误
+
+#### 🔧 技术改进
+- 统一所有配置文件中的数据库连接字符串格式
+- 移除SQLite相关的残留配置
+- 优化前端组件的错误处理机制
+- 完善数据库模型与实际表结构的一致性
+- 修正前端API调用路径，确保与后端路由配置一致
+- 添加Authorization头部认证，提升API安全性
+
+#### 📋 当前状态
+- ✅ 前端服务器：正常运行在 http://localhost:3000
+- ✅ 后端服务器：正常运行在 http://localhost:8080
+- ✅ 数据库连接：MySQL配置统一且稳定
+- ✅ 所有核心功能：测试通过并可正常使用
 
 ## 快速开始
 
@@ -81,7 +237,8 @@ CREATE DATABASE api_project_database CHARACTER SET utf8mb4 COLLATE utf8mb4_unico
 
 3. **配置数据库连接**：
    - 修改 `backend/.env` 文件中的 `DATABASE_URL`
-   - 格式：`mysql+mysqlclient://username:password@host:port/database_name`
+   - 格式：`mysql+mysqldb://username:password@host:port/database_name`
+   - 示例：`mysql+mysqldb://root:CRBF261900jqr@localhost:3306/api_project_database`
 
 4. **初始化数据库**：
 ```bash
@@ -94,7 +251,7 @@ python init_db.py
 python main.py
 ```
 
-后端服务将在 `http://localhost:8000` 启动
+后端服务将在 `http://localhost:8080` 启动
 
 ### 2. 前端设置
 
@@ -115,21 +272,20 @@ npm run dev
 
 **⚠️ 重要说明**：当前数据库中的实际用户与初始化脚本不同
 
-### 实际存在的用户账户
+### 默认用户账户
 
-| 用户ID | 用户名 | 邮箱 | 角色 | 状态 |
-|--------|--------|------|------|------|
-| 5 | admin | admin@test.com | user | 激活 |
-| 6 | Test User | test@example.com | user | 激活 |
-| 7 | **jinqianru** | 123@qq.com | user | 激活 |
-| 8 | testuser | testuser@test.com | user | 激活 |
+系统初始化后会创建以下默认账户：
+
+| 用户名 | 邮箱 | 密码 | 角色 | 状态 |
+|--------|------|------|------|------|
+| admin | admin@example.com | admin123 | admin | 激活 |
+| testuser | test@example.com | test123 | user | 激活 |
 
 ### 关键信息
-- **jinqianru用户**（ID=7）是主要的任务创建者，拥有3个API开发任务
-- **所有用户角色都是普通用户**，当前没有管理员用户
-- **任务状态**：jinqianru的所有任务都处于"testing"状态
-
-**⚠️ 重要提示：如需管理员权限，请手动修改数据库中的用户角色！**
+- **admin用户**：拥有管理员权限，可以审核任务和管理用户
+- **testuser用户**：普通用户，可以创建和管理自己的任务
+- 首次运行时请使用这些默认账户登录
+- 登录后建议修改默认密码
 
 ## 主要功能使用说明
 
@@ -183,8 +339,8 @@ npm run dev
 ## API文档
 
 后端启动后，可以访问以下地址查看API文档：
-- **Swagger UI**：`http://localhost:8000/docs`
-- **ReDoc**：`http://localhost:8000/redoc`
+- **Swagger UI**：`http://localhost:8080/docs`
+- **ReDoc**：`http://localhost:8080/redoc`
 
 ### 主要API端点
 
@@ -213,24 +369,52 @@ npm run dev
 - `PUT /api/notifications/{notification_id}/read` - 标记通知已读
 - `PUT /api/notifications/mark-all-read` - 标记所有通知已读
 
+#### 自动化测试功能
+- `POST /api/test/syntax-check` - 语法检查
+- `POST /api/test/unit-test` - 单元测试
+- `POST /api/test/api-test` - API测试
+- `POST /api/test/performance-test` - 性能测试
+- `POST /api/test/full-test` - 综合测试
+
+#### 工作流程管理
+- `POST /api/workflow/sessions` - 创建工作流程会话
+- `GET /api/workflow/sessions/{session_id}` - 获取会话详情
+- `POST /api/workflow/sessions/{session_id}/execute` - 执行工作流程
+- `GET /api/workflow/sessions/{session_id}/steps` - 获取步骤列表
+
+#### Git操作
+- `POST /api/git/create-branch` - 创建分支
+- `POST /api/git/commit` - 提交代码
+- `POST /api/git/push` - 推送代码
+- `GET /api/git/status` - 获取Git状态
+
+#### AI服务
+- `POST /api/ai/generate-code` - 生成代码
+- `POST /api/ai/fix-issues` - 修复问题
+- `POST /api/ai/optimize-code` - 优化代码
+
 ## 配置说明
 
 ### 环境变量
 可以通过环境变量配置以下选项：
 
 ```bash
-# MySQL 数据库配置（当前使用）
-DATABASE_URL=mysql+mysqlclient://root:your_password@localhost:3306/api_project_database
+# MySQL 数据库配置
+DATABASE_URL=mysql+mysqldb://root:CRBF261900jqr@localhost:3306/api_project_database
 
-# OpenAI API配置（可选）
-OPENAI_API_KEY=your_openai_api_key_here
+# AI服务配置（OpenRouter）
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+AI_MODEL=anthropic/claude-3-5-sonnet-20241022
 
 # JWT配置
 SECRET_KEY=your_secret_key_here
-ACCESS_TOKEN_EXPIRE_MINUTES=43200
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # 开发环境配置
 ENVIRONMENT=development
+DEBUG=True
 ```
 
 ## 数据库结构
@@ -250,13 +434,70 @@ ENVIRONMENT=development
 - id, username, email, password_hash, role, is_active, created_at, updated_at
 
 **tasks表**：
-- id, user_id, title, description, input_params, output_params, status, branch_name, generated_code, test_cases, test_result_image, test_url, admin_comment, created_at, updated_at
+- id, user_id, title, description, input_params, output_params, status, branch_name, generated_code, test_cases, test_result_image, test_url, test_status, test_results, admin_comment, created_at, updated_at
 
 **notifications表**：
 - id, user_id, task_id, title, content, type, is_read, created_at
 
 **task_logs表**：
 - id, task_id, status, message, created_at
+
+**workflow_sessions表**：
+- id, task_id, session_name, current_step, total_steps, status, created_at, updated_at
+
+**workflow_steps表**：
+- id, session_id, step_number, step_name, step_type, status, input_data, output_data, error_message, started_at, completed_at
+
+**step_actions表**：
+- id, step_id, action_type, action_data, status, result, created_at
+
+### 🔍 数据库类型映射说明
+
+**重要提示**：本项目使用MySQL数据库，存在以下类型映射行为：
+
+#### BOOLEAN字段的MySQL映射
+SQLAlchemy模型中定义的`Boolean`类型字段，在MySQL中会自动映射为`TINYINT(1)`类型：
+
+| SQLAlchemy模型定义 | MySQL实际存储 | 说明 |
+|-------------------|---------------|------|
+| `Boolean` | `TINYINT(1)` | MySQL标准行为 |
+| `True` | `1` | 布尔真值 |
+| `False` | `0` | 布尔假值 |
+
+#### 受影响的字段
+以下字段在模型中定义为Boolean，在数据库中存储为TINYINT(1)：
+- `users.is_active` - 用户激活状态
+- `notifications.is_read` - 通知已读状态
+- `workflow_steps.requires_user_input` - 步骤是否需要用户输入
+- `step_actions.is_validated` - 动作是否已验证
+
+#### 功能影响
+- ✅ **应用功能完全正常**：SQLAlchemy自动处理类型转换
+- ✅ **API返回正确**：布尔值在JSON中正确序列化为true/false
+- ✅ **数据存储正确**：TINYINT(1)完全支持布尔值存储
+- ⚠️ **文档差异**：模型定义与数据库schema存在类型描述差异
+
+#### 开发注意事项
+1. 这种类型映射是MySQL的标准行为，不是错误
+2. 在编写SQL查询时，布尔字段使用0/1值
+3. 在Python代码中，继续使用True/False值
+4. 静态分析工具可能会标记类型不一致，这是正常现象
+
+### 数据库一致性检查
+
+项目提供了自动化的数据库模型检查工具：
+
+```bash
+# 运行全面的模型与数据库对比检查
+cd backend
+python comprehensive_model_check.py
+```
+
+该工具会：
+- 检查所有表结构与模型定义的匹配情况
+- 识别缺失或多余的表和字段
+- 生成详细的对比报告
+- 提供修复建议
 
 ### MySQL配置要求
 
@@ -295,13 +536,15 @@ ENVIRONMENT=development
 3. **配置环境变量**
    在 `.env` 文件中设置：
    ```
-   DATABASE_URL=mysql+mysqldb://用户名:密码@localhost:3306/数据库名
+   DATABASE_URL=mysql+mysqldb://root:CRBF261900jqr@localhost:3306/api_project_database
    ```
 
 4. **安装Python依赖**
    ```bash
-   pip install mysqlclient
+   pip install mysqlclient>=2.2.0
    ```
+   
+   **注意**：项目使用 `mysql+mysqldb` 驱动，需要安装 `mysqlclient` 包
 
 5. **测试连接**
    ```bash
@@ -315,6 +558,7 @@ ENVIRONMENT=development
 
 **⚠️ 重要提示：**
 - 确保MySQL服务正在运行
+- 项目统一使用 `mysql+mysqldb` 驱动，确保配置一致性
 - 请妥善保管数据库密码
 - 生产环境建议使用专用数据库用户
 - 定期备份重要数据

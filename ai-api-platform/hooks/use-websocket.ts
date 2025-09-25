@@ -28,7 +28,7 @@ export function useWebSocket(): UseWebSocketReturn {
     }
 
     try {
-      const wsUrl = `ws://localhost:8000/ws?token=${token}`
+      const wsUrl = `ws://localhost:8080/ws?token=${token}`
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 

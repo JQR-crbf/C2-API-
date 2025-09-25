@@ -11,7 +11,7 @@
 ### 1. 数据库配置更新 ✅
 - **文件**: `backend/database.py`
 - **更改**: 数据库连接从SQLite改为MySQL
-- **连接字符串**: `mysql+mysqlclient://root:password@localhost:3306/api_project_database`
+- **连接字符串**: `mysql+mysqldb://root:password@localhost:3306/api_project_database`
 - **连接池配置**: 已优化MySQL连接池参数
 
 ### 2. 环境变量配置 ✅

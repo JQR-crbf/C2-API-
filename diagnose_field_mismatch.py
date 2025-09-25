@@ -38,7 +38,7 @@ def check_backend_api_response():
             'Content-Type': 'application/json'
         }
         
-        response = requests.get('http://localhost:8000/api/tasks/', headers=headers)
+        response = requests.get('http://localhost:8080/api/tasks/', headers=headers)
         
         if response.status_code == 200:
             tasks_data = response.json()

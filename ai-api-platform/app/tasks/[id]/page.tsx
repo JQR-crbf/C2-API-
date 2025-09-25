@@ -25,6 +25,7 @@ import { ProtectedRoute, useAuth } from "@/contexts/AuthContext"
 import { tasks, admin, Task } from "@/lib/api"
 import { getProgressFromStatus, getStatusIcon, getStatusBadgeProps, getStatusText } from '@/lib/task-status'
 import { TaskWorkflow } from '@/components/task-workflow'
+import { GuidedDeployment } from '@/components/guided-deployment'
 
 
 
@@ -210,11 +211,12 @@ function TaskDetailsContent() {
 
         {/* Tabs */}
         <Tabs defaultValue="progress" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="progress">进度</TabsTrigger>
             <TabsTrigger value="code">生成代码</TabsTrigger>
             <TabsTrigger value="logs">执行日志</TabsTrigger>
             <TabsTrigger value="testing">测试</TabsTrigger>
+            <TabsTrigger value="deployment">引导部署</TabsTrigger>
           </TabsList>
 
           <TabsContent value="progress" className="space-y-4">
@@ -309,6 +311,14 @@ function TaskDetailsContent() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="deployment" className="space-y-4">
+            <GuidedDeployment 
+              taskId={parseInt(taskId)}
+              taskTitle={task.title}
+              generatedCode={task.generated_code || ''}
+            />
           </TabsContent>
         </Tabs>
       </div>

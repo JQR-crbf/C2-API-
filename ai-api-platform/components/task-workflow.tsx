@@ -4,9 +4,11 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Clock, AlertCircle, Play, Loader2 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CheckCircle, Clock, AlertCircle, Play, Loader2, Zap } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/contexts/AuthContext"
+import { EnhancedWorkflow } from "./enhanced-workflow"
 
 interface WorkflowStep {
   index: number
@@ -30,13 +32,44 @@ interface WorkflowInfo {
   all_steps: WorkflowStep[]
 }
 
+interface LegacyWorkflowStep {
+  step_id: number
+  step_name: string
+  name: string
+  status: string
+  auto_status: string
+  description?: string
+  estimated_duration?: number
+  started_at?: string
+  completed_at?: string
+  duration_seconds?: number
+  error_message?: string
+  completed: boolean
+  current: boolean
+  auto: boolean
+  can_advance: boolean
+  required_actions: string[]
+}
+
+interface LegacyWorkflowInfo {
+  workflow_id: number
+  status: string
+  current_step: number
+  total_steps: number
+  progress_percentage: number
+  created_at: string
+  updated_at: string
+  steps: LegacyWorkflowStep[]
+  all_steps: LegacyWorkflowStep[]
+}
+
 interface TaskWorkflowProps {
   taskId: number
   onStatusUpdate?: () => void
 }
 
-export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
-  const [workflow, setWorkflow] = useState<WorkflowInfo | null>(null)
+function LegacyWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
+  const [workflowInfo, setWorkflowInfo] = useState<LegacyWorkflowInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isAdvancing, setIsAdvancing] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -50,7 +83,7 @@ export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
   const loadWorkflow = async () => {
     try {
       setIsLoading(true)
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
       const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/workflow`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
@@ -62,7 +95,7 @@ export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
       }
       
       const data = await response.json()
-      setWorkflow(data.workflow)
+      setWorkflowInfo(data.workflow)
     } catch (error) {
       console.error('加载工作流程失败:', error)
       toast({
@@ -78,7 +111,7 @@ export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
   const advanceToNextStep = async () => {
     try {
       setIsAdvancing(true)
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
       const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/advance`, {
         method: 'POST',
         headers: {
@@ -120,7 +153,7 @@ export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
   const markActionCompleted = async (action: string, stepName: string) => {
     try {
       setActionLoading(action)
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
       const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/actions/${action}/complete`, {
         method: 'POST',
         headers: {
@@ -184,7 +217,7 @@ export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
     )
   }
 
-  if (!workflow) {
+  if (!workflowInfo) {
     return (
       <Card className="border-border">
         <CardHeader>
@@ -209,16 +242,16 @@ export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
         </CardDescription>
         <div className="flex items-center gap-4 mt-2">
           <div className="text-sm text-muted-foreground">
-            进度: {workflow.current_step_index + 1} / {workflow.total_steps}
+            进度: {workflowInfo.current_step + 1} / {workflowInfo.total_steps}
           </div>
           <Badge variant="outline">
-            {workflow.progress_percentage}% 完成
+            {workflowInfo.progress_percentage}% 完成
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
-          {workflow.all_steps.map((step, index) => {
+          {workflowInfo.all_steps.map((step: LegacyWorkflowStep, index: number) => {
             const isCompleted = step.completed && !step.current
             const isCurrent = step.current
             const isUpcoming = !step.completed && !step.current
@@ -272,7 +305,7 @@ export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
                         需要完成的操作:
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {step.required_actions.map((action) => (
+                        {step.required_actions.map((action: string) => (
                           <Button
                             key={action}
                             size="sm"
@@ -330,5 +363,28 @@ export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
+  return (
+    <Tabs defaultValue="enhanced" className="w-full">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="enhanced" className="flex items-center gap-2">
+          <Zap className="h-4 w-4" />
+          增强版工作流
+        </TabsTrigger>
+        <TabsTrigger value="legacy" className="flex items-center gap-2">
+          <Play className="h-4 w-4" />
+          传统工作流
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="enhanced">
+        <EnhancedWorkflow taskId={taskId} onStatusUpdate={onStatusUpdate} />
+      </TabsContent>
+      <TabsContent value="legacy">
+        <LegacyWorkflow taskId={taskId} onStatusUpdate={onStatusUpdate} />
+      </TabsContent>
+    </Tabs>
   )
 }

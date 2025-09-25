@@ -110,6 +110,20 @@ export default function LoginPage() {
                   "登录"
                 )}
               </Button>
+              
+              {/* 测试登录按钮 */}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                onClick={() => {
+                  setUsername("jinqianru")
+                  setPassword("123456")
+                }}
+                disabled={isLoading}
+              >
+                使用测试账户登录
+              </Button>
             </form>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">

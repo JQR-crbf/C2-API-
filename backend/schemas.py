@@ -45,7 +45,7 @@ class TaskCreate(BaseModel):
     description: str
     language: Optional[str] = "python"
     framework: Optional[str] = "fastapi"
-    database: Optional[str] = "sqlite"
+    database: Optional[str] = "mysql"
     features: Optional[List[str]] = []
 
 class TaskUpdate(BaseModel):
@@ -146,3 +146,89 @@ class MessageResponse(BaseModel):
 class ErrorResponse(BaseModel):
     detail: str
     error_code: Optional[str] = None
+
+# 引导部署相关模式
+class ServerConfig(BaseModel):
+    host: str = Field(..., description="服务器IP地址或域名")
+    port: int = Field(22, description="SSH端口号")
+    username: str = Field(..., description="服务器用户名")
+    deployment_path: str = Field(..., description="项目部署路径")
+    git_repo_url: Optional[str] = Field(None, description="Git仓库地址")
+
+class ServerAuthConfig(BaseModel):
+    password: Optional[str] = Field(None, description="SSH密码")
+    key_path: Optional[str] = Field(None, description="SSH私钥文件路径")
+    key_content: Optional[str] = Field(None, description="SSH私钥内容")
+
+class ServerConnectionConfig(BaseModel):
+    host: str = Field(..., description="服务器IP地址或域名")
+    port: int = Field(22, description="SSH端口号")
+    username: str = Field(..., description="服务器用户名")
+    password: Optional[str] = Field(None, description="SSH密码")
+    key_path: Optional[str] = Field(None, description="SSH私钥文件路径")
+    key_content: Optional[str] = Field(None, description="SSH私钥内容")
+
+class DeploymentSessionCreate(BaseModel):
+    task_id: int
+    server_config: ServerConfig
+    auth_config: ServerAuthConfig
+
+class DeploymentStepResponse(BaseModel):
+    id: int
+    step_number: int
+    step_name: str
+    step_description: str
+    command: Optional[str] = None
+    expected_output: Optional[str] = None
+    actual_output: Optional[str] = None
+    status: str
+    error_message: Optional[str] = None
+    file_path: Optional[str] = None
+    file_content: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class DeploymentSessionResponse(BaseModel):
+    id: int
+    task_id: int
+    user_id: int
+    server_host: str
+    server_port: int
+    server_username: str
+    connection_status: str
+    current_step: int
+    deployment_path: Optional[str] = None
+    git_repo_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    steps: List[DeploymentStepResponse] = []
+    
+    class Config:
+        from_attributes = True
+
+class DeploymentConnectionResponse(BaseModel):
+    success: bool
+    connection_id: Optional[str] = None
+    message: str
+
+class DeploymentStepExecuteRequest(BaseModel):
+    step_id: int
+    connection_id: str
+
+class DeploymentStepExecuteResponse(BaseModel):
+    success: bool
+    stdout: str
+    stderr: str
+    next_step_id: Optional[int] = None
+
+class ServerConnectionInfo(BaseModel):
+    connection_id: str
+    host: str
+    port: int
+    username: str
+    created_at: datetime
+    last_used: datetime
+    is_active: bool

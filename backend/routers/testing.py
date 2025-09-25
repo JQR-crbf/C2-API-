@@ -126,7 +126,7 @@ async def get_test_endpoints(
         {
             'name': '用户认证测试',
             'method': 'POST',
-            'url': 'http://localhost:8000/api/auth/login',
+            'url': 'http://localhost:8080/api/auth/login',
             'description': '测试用户登录功能',
             'sample_body': {
                 'username': 'admin',
@@ -136,7 +136,7 @@ async def get_test_endpoints(
         {
             'name': '获取当前用户信息',
             'method': 'GET',
-            'url': 'http://localhost:8000/api/auth/me',
+            'url': 'http://localhost:8080/api/auth/me',
             'description': '获取当前登录用户的信息',
             'headers': {
                 'Authorization': 'Bearer YOUR_TOKEN_HERE'
@@ -145,7 +145,7 @@ async def get_test_endpoints(
         {
             'name': '获取任务列表',
             'method': 'GET',
-            'url': 'http://localhost:8000/api/tasks',
+            'url': 'http://localhost:8080/api/tasks',
             'description': '获取用户的任务列表',
             'headers': {
                 'Authorization': 'Bearer YOUR_TOKEN_HERE'
@@ -154,7 +154,7 @@ async def get_test_endpoints(
         {
             'name': '健康检查',
             'method': 'GET',
-            'url': 'http://localhost:8000/health',
+            'url': 'http://localhost:8080/health',
             'description': '检查后端服务状态'
         }
     ]

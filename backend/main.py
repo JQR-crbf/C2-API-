@@ -73,12 +73,19 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 # 路由注册
-from routers import auth, tasks, admin, notifications, testing
+from routers import auth, tasks, admin, notifications, testing, workflow, ai_router, git_router, test_router, ssh_router, deployment_router, terminal_router
 app.include_router(auth.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(testing.router, prefix="/api")
+app.include_router(workflow.router, prefix="/api")
+app.include_router(ai_router.router, prefix="/api")
+app.include_router(ssh_router.router, prefix="/api")
+app.include_router(deployment_router.router, prefix="/api")
+app.include_router(terminal_router.router, prefix="/api")
+app.include_router(git_router.router)
+app.include_router(test_router.router)
 
 @app.get("/")
 async def root():
@@ -151,4 +158,4 @@ async def shutdown_event():
     print("后台任务处理器已停止")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)

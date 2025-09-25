@@ -567,7 +567,7 @@ app.include_router(your_api.router, prefix="/api/v1/your-endpoint", tags=["你�
 #### 数据库连接配置
 ```python
 # 如果需要新的数据库连接，在 app/config.py 中添加
-NEW_DATABASE_URL: str = "mysql+pymysql://user:password@host:port/dbname"
+NEW_DATABASE_URL: str = "mysql+mysqldb://user:password@host:port/dbname"
 
 # 创建对应的数据库连接文件 app/database_new.py
 ```

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
 # 后端API地址
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "http://localhost:8080"
 
 def check_user_credentials():
     """检查jinqianru用户的登录凭据"""
