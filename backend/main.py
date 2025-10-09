@@ -121,13 +121,8 @@ async def root():
 @app.get("/health")
 async def health_check():
     """健康检查端点 - Railway部署必需"""
-    from datetime import datetime
-    # 简化健康检查，确保快速响应
-    return {
-        "status": "healthy", 
-        "service": "ai-api-platform-backend",
-        "timestamp": datetime.now().isoformat()
-    }
+    # 极简健康检查，确保最快响应
+    return {"status": "ok"}
 
 # WebSocket端点
 @app.websocket("/ws")
