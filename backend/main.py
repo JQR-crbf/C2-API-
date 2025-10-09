@@ -60,10 +60,18 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS配置
+# CORS配置 - 支持环境变量配置
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# 从环境变量读取允许的源，默认包含本地开发地址
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # 前端地址
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

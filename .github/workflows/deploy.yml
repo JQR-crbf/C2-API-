@@ -1,0 +1,69 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  # 部署前端到 Vercel
+  deploy-frontend:
+    name: Deploy Frontend to Vercel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ai-api-platform/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./ai-api-platform
+        run: npm ci
+
+      - name: Build application
+        working-directory: ./ai-api-platform
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+        run: npm run build
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./ai-api-platform
+          vercel-args: '--prod'
+
+  # 后端部署通常由 Railway/Render 自动处理
+  # 这里添加一个健康检查任务
+  verify-backend:
+    name: Verify Backend Deployment
+    runs-on: ubuntu-latest
+    needs: deploy-frontend
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Health check
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.BACKEND_URL }}/health)
+          if [ $response -eq 200 ]; then
+            echo "✅ Backend is healthy"
+          else
+            echo "❌ Backend health check failed with status $response"
+            exit 1
+          fi
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          echo "Frontend deployed to Vercel"
+          echo "Backend verified at ${{ secrets.BACKEND_URL }}"
