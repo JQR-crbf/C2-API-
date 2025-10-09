@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from models import UserRole, TaskStatus, NotificationType
+from models import UserRole, TaskStatus, NotificationType, TaskPriority
 
 # 用户相关模式
 class UserBase(BaseModel):
@@ -17,6 +17,12 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = Field(None, min_length=3, max_length=50)
+    email: Optional[EmailStr] = None
+    role: Optional[UserRole] = None
+    password: Optional[str] = Field(None, min_length=6)
 
 class UserResponse(UserBase):
     id: int
@@ -47,6 +53,7 @@ class TaskCreate(BaseModel):
     framework: Optional[str] = "fastapi"
     database: Optional[str] = "mysql"
     features: Optional[List[str]] = []
+    priority: Optional[TaskPriority] = TaskPriority.MEDIUM
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -58,6 +65,7 @@ class TaskResponse(TaskBase):
     id: int
     user_id: int
     status: TaskStatus
+    priority: TaskPriority
     branch_name: Optional[str] = None
     generated_code: Optional[str] = None
     test_cases: Optional[str] = None
@@ -81,9 +89,12 @@ class TaskListResponse(BaseModel):
 class TaskLogResponse(BaseModel):
     id: int
     task_id: int
+    user_id: Optional[int] = None
+    action_type: str
     status: str
     message: Optional[str] = None
     created_at: datetime
+    user_name: Optional[str] = None  # 操作用户名称
     
     class Config:
         from_attributes = True
@@ -156,14 +167,6 @@ class ServerConfig(BaseModel):
     git_repo_url: Optional[str] = Field(None, description="Git仓库地址")
 
 class ServerAuthConfig(BaseModel):
-    password: Optional[str] = Field(None, description="SSH密码")
-    key_path: Optional[str] = Field(None, description="SSH私钥文件路径")
-    key_content: Optional[str] = Field(None, description="SSH私钥内容")
-
-class ServerConnectionConfig(BaseModel):
-    host: str = Field(..., description="服务器IP地址或域名")
-    port: int = Field(22, description="SSH端口号")
-    username: str = Field(..., description="服务器用户名")
     password: Optional[str] = Field(None, description="SSH密码")
     key_path: Optional[str] = Field(None, description="SSH私钥文件路径")
     key_content: Optional[str] = Field(None, description="SSH私钥内容")

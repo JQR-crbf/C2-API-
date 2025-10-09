@@ -16,12 +16,7 @@ export async function POST(
 
     const body = await request.json()
 
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
-    const apiUrl = `${backendUrl}/api/tasks/${params.id}/deployment/connect`
-    
-    console.log('Fetching from:', apiUrl)
-    
-    const response = await fetch(apiUrl, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/tasks/${params.id}/deployment/connect`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -29,8 +24,6 @@ export async function POST(
       },
       body: JSON.stringify(body)
     })
-    
-    console.log('Response status:', response.status)
 
     if (!response.ok) {
       const errorData = await response.json()

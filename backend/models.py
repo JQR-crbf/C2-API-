@@ -9,22 +9,22 @@ class UserRole(str, enum.Enum):
     USER = "user"
 
 class TaskStatus(str, enum.Enum):
-    SUBMITTED = "submitted"           # 已提交
-    CODE_PULLING = "code_pulling"     # 拉取代码中
-    BRANCH_CREATED = "branch_created" # 分支已创建
-    AI_GENERATING = "ai_generating"   # AI生成代码中
-    TEST_READY = "test_ready"         # 测试环境准备就绪
-    TESTING = "testing"               # 测试中
-    TEST_COMPLETED = "test_completed" # 测试完成
-    DEPLOYMENT_READY = "deployment_ready"         # 准备部署
-    DEPLOYMENT_IN_PROGRESS = "deployment_in_progress"  # 部署中
-    DEPLOYMENT_COMPLETED = "deployment_completed"      # 部署完成
-    CODE_PUSHED = "code_pushed"       # 代码已推送
-    GIT_PUSHED = "git_pushed"         # 已推送到Git
-    UNDER_REVIEW = "under_review"     # 管理员审核中
+    # 简化的5个核心步骤
+    SUBMITTED = "submitted"           # 1. 任务提交
+    AI_GENERATING = "ai_generating"   # 2. 代码生成
+    TEST_READY = "test_ready"         # 3. 测试准备就绪
+    CODE_SUBMITTED = "code_submitted" # 4. 代码提交
+    UNDER_REVIEW = "under_review"     # 5. 管理员审核
+    DEPLOYED = "deployed"             # 6. 部署完成
+    
+    # 审核结果状态
     APPROVED = "approved"             # 审核通过
-    DEPLOYED = "deployed"             # 已部署
     REJECTED = "rejected"             # 审核拒绝
+
+class TaskPriority(str, enum.Enum):
+    HIGH = "high"     # 高优先级
+    MEDIUM = "medium" # 中优先级
+    LOW = "low"       # 低优先级
 
 class NotificationType(str, enum.Enum):
     INFO = "info"
@@ -59,6 +59,7 @@ class Task(Base):
     input_params = Column(JSON)  # 输入参数定义
     output_params = Column(JSON)  # 输出参数定义
     status = Column(Enum(TaskStatus), default=TaskStatus.SUBMITTED)
+    priority = Column(Enum(TaskPriority), default=TaskPriority.MEDIUM)  # 任务优先级
     branch_name = Column(String(100))  # Git分支名
     git_branch = Column(String(100))  # Git功能分支名
     git_commit_hash = Column(String(50))  # Git提交哈希
@@ -98,12 +99,15 @@ class TaskLog(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # 操作用户ID
+    action_type = Column(String(50), nullable=False)  # 操作类型：create_task, generate_code, submit_code, review, deploy等
     status = Column(String(50), nullable=False)
     message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # 关系
     task = relationship("Task", back_populates="logs")
+    user = relationship("User")  # 操作用户
 
 class DeploymentConnectionStatus(str, enum.Enum):
     DISCONNECTED = "disconnected"
@@ -172,7 +176,6 @@ class DeploymentSession(Base):
     deployment_path = Column(String(500))  # 项目部署路径
     git_repo_url = Column(String(500))  # Git仓库地址
     ssh_key_path = Column(String(500))  # SSH密钥路径
-    ssh_key_content = Column(Text)  # SSH密钥内容
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

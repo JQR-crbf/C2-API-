@@ -93,7 +93,7 @@ export async function POST(
   } catch (error) {
     console.error('创建部署会话失败:', error)
     return NextResponse.json(
-      { error: '服务器内部错误' },
+      { error: '服务器内部错误', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

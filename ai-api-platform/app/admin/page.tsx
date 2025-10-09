@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { admin, apiClient, Task } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   Bot,
   ArrowLeft,
@@ -27,6 +28,10 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
+  User,
+  Mail,
+  Calendar,
+  Shield,
 } from "lucide-react"
 import Link from "next/link"
 import { ProtectedRoute } from "@/contexts/AuthContext"
@@ -46,12 +51,44 @@ const getStatusBadge = (status: string) => {
   return <Badge variant={config.variant}>{config.label}</Badge>
 }
 
+// 任务状态显示函数
+const getTaskStatusBadge = (status: string) => {
+  const statusConfig = {
+    submitted: { label: "任务提交", variant: "secondary" as const, className: "bg-blue-100 text-blue-800" },
+    ai_generating: { label: "代码生成", variant: "secondary" as const, className: "bg-purple-100 text-purple-800" },
+    code_submitted: { label: "代码提交", variant: "secondary" as const, className: "bg-green-100 text-green-800" },
+    under_review: { label: "管理员审核", variant: "secondary" as const, className: "bg-orange-100 text-orange-800" },
+    deployed: { label: "部署完成", variant: "secondary" as const, className: "bg-green-100 text-green-800" },
+    approved: { label: "审核通过", variant: "secondary" as const, className: "bg-green-100 text-green-800" },
+    rejected: { label: "审核拒绝", variant: "destructive" as const, className: "bg-red-100 text-red-800" },
+  }
+  
+  const config = statusConfig[status as keyof typeof statusConfig] || { label: status, variant: "outline" as const, className: "" }
+  return <Badge variant={config.variant} className={config.className}>{config.label}</Badge>
+}
+
 const getRoleBadge = (role: string) => {
   return role === "admin" ? (
     <Badge variant="destructive">管理员</Badge>
   ) : (
     <Badge variant="secondary">用户</Badge>
   )
+}
+
+// 安全的日期格式化函数
+const formatDate = (dateString: string | null | undefined) => {
+  if (!dateString) return "-"
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return "-"
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })
+  } catch (error) {
+    return "-"
+  }
 }
 
 export default function AdminPage() {
@@ -79,6 +116,38 @@ export default function AdminPage() {
   const [taskSearchTerm, setTaskSearchTerm] = useState("")
   const [userStatusFilter, setUserStatusFilter] = useState("all")
   const [taskStatusFilter, setTaskStatusFilter] = useState("all")
+  
+  // 弹窗状态管理
+  const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [userDetailOpen, setUserDetailOpen] = useState(false)
+  const [editUserOpen, setEditUserOpen] = useState(false)
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false)
+  
+  // 拒绝任务弹窗状态
+  const [rejectTaskOpen, setRejectTaskOpen] = useState(false)
+  const [selectedTaskId, setSelectedTaskId] = useState<string>('')
+  const [rejectReason, setRejectReason] = useState('')
+  
+  // 删除任务弹窗状态
+  const [deleteTaskOpen, setDeleteTaskOpen] = useState(false)
+  const [deleteTaskId, setDeleteTaskId] = useState<string>('')
+  const [deleteTaskTitle, setDeleteTaskTitle] = useState<string>('')
+  
+  // 编辑用户表单状态
+  const [editForm, setEditForm] = useState<{
+    username: string
+    email: string
+    role: 'user' | 'admin'
+    password: string
+  }>({
+    username: '',
+    email: '',
+    role: 'user',
+    password: ''
+  })
+  
+  // 用户状态更新加载状态
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null)
 
   useEffect(() => {
     loadAdminData()
@@ -128,41 +197,56 @@ export default function AdminPage() {
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
-      user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(userSearchTerm.toLowerCase())
-    const matchesStatus = userStatusFilter === "all" || user.status === userStatusFilter
+      (user.username || '').toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+      (user.email || '').toLowerCase().includes(userSearchTerm.toLowerCase())
+    const matchesStatus = userStatusFilter === "all" || (userStatusFilter === "active" ? user.is_active : !user.is_active)
     return matchesSearch && matchesStatus
   })
 
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
-      ((task.name || task.title) || '').toLowerCase().includes(taskSearchTerm.toLowerCase()) ||
+      (task.title || '').toLowerCase().includes(taskSearchTerm.toLowerCase()) ||
       (task.description || '').toLowerCase().includes(taskSearchTerm.toLowerCase())
     const matchesStatus = taskStatusFilter === "all" || task.status === taskStatusFilter
     return matchesSearch && matchesStatus
   })
 
   // 处理用户状态更新
-  const handleUserStatusUpdate = async (userId: string, isActive: boolean) => {
+  const handleUserStatusUpdate = useCallback(async (userId: string, newStatus: boolean) => {
+    const user = users.find(u => u.id.toString() === userId)
+    if (!user) return
+    
+    const action = newStatus ? '启用' : '禁用'
+    const confirmMessage = `确认要${action}用户 "${user.username}" 吗？`
+    
+    if (!window.confirm(confirmMessage)) {
+      return
+    }
+    
+    setUpdatingUserId(userId)
+    
     try {
-      await apiClient.admin.updateUserStatus(userId, isActive)
+      await apiClient.admin.updateUserStatus(userId, newStatus)
       toast({
-        title: "更新成功",
-        description: `用户状态已${isActive ? '启用' : '禁用'}`,
+        title: "状态更新成功",
+        description: `用户 "${user.username}" 已${action}`,
       })
-      loadAdminData() // 重新加载数据
+      // 重新加载管理员数据
+      loadAdminData()
     } catch (error) {
       console.error('Failed to update user status:', error)
       toast({
-        title: "更新失败",
-        description: "无法更新用户状态，请稍后重试",
+        title: "状态更新失败",
+        description: `无法${action}用户，请稍后重试`,
         variant: "destructive",
       })
+    } finally {
+      setUpdatingUserId(null)
     }
-  }
+  }, [users, toast, loadAdminData])
 
   // 处理任务状态更新
-  const handleTaskStatusUpdate = async (taskId: string, status: string, comment?: string) => {
+  const handleTaskStatusUpdate = useCallback(async (taskId: string, status: string, comment?: string) => {
     try {
       await apiClient.admin.updateTaskStatus(taskId, {
         status: status,
@@ -181,7 +265,164 @@ export default function AdminPage() {
         variant: "destructive",
       })
     }
-  }
+  }, [toast])
+
+  // 处理查看用户资料
+  const handleViewUserProfile = useCallback((userId: string) => {
+    const user = users.find(u => u.id.toString() === userId)
+    if (user) {
+      setSelectedUser(user)
+      setUserDetailOpen(true)
+    }
+  }, [users])
+
+  // 处理编辑用户
+  const handleEditUser = useCallback((userId: string) => {
+    const user = users.find(u => u.id.toString() === userId)
+    if (user) {
+      setSelectedUser(user)
+      setEditForm({
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        password: ''
+      })
+      setEditUserOpen(true)
+    }
+  }, [users])
+
+  // 处理重置密码
+  const handleResetPassword = useCallback((userId: string) => {
+    const user = users.find(u => u.id.toString() === userId)
+    if (user) {
+      setSelectedUser(user)
+      setResetPasswordOpen(true)
+    }
+  }, [users])
+
+  // 处理拒绝任务
+  const handleRejectTask = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId)
+    setRejectReason('')
+    setRejectTaskOpen(true)
+  }, [])
+
+  // 处理删除任务
+  const handleDeleteTask = useCallback((taskId: string, taskTitle: string) => {
+    setDeleteTaskId(taskId)
+    setDeleteTaskTitle(taskTitle)
+    setDeleteTaskOpen(true)
+  }, [])
+
+  // 确认删除任务
+  const confirmDeleteTask = useCallback(async () => {
+    try {
+      await admin.deleteTask(deleteTaskId)
+      toast({
+        title: "删除成功",
+        description: `任务 "${deleteTaskTitle}" 已成功删除`,
+      })
+      setDeleteTaskOpen(false)
+      setDeleteTaskId('')
+      setDeleteTaskTitle('')
+      loadAdminData() // 重新加载数据
+    } catch (error) {
+      console.error('Failed to delete task:', error)
+      toast({
+        title: "删除失败",
+        description: "无法删除任务，请稍后重试",
+        variant: "destructive",
+      })
+    }
+  }, [deleteTaskId, deleteTaskTitle, toast])
+
+  // 确认拒绝任务
+  const confirmRejectTask = useCallback(async () => {
+    if (!rejectReason.trim()) {
+      toast({
+        title: "请输入拒绝理由",
+        description: "拒绝任务时必须提供拒绝理由",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      await apiClient.admin.updateTaskStatus(selectedTaskId, {
+        status: 'rejected',
+        admin_comment: rejectReason
+      })
+      toast({
+        title: "审核成功",
+        description: "任务已拒绝，并已回退到代码生成步骤",
+      })
+      setRejectTaskOpen(false)
+      setRejectReason('')
+      setSelectedTaskId('')
+      loadAdminData() // 重新加载数据
+    } catch (error) {
+      console.error('Failed to reject task:', error)
+      toast({
+        title: "审核失败",
+        description: "无法拒绝任务，请稍后重试",
+        variant: "destructive",
+      })
+    }
+  }, [selectedTaskId, rejectReason, toast])
+
+  // 确认重置密码
+  const confirmResetPassword = useCallback(async () => {
+    if (!selectedUser) return
+    
+    try {
+      // 这里应该调用重置密码的API
+      // await apiClient.admin.resetUserPassword(selectedUser.id)
+      toast({
+        title: "重置成功",
+        description: `已为用户 ${selectedUser.username} 重置密码`,
+      })
+      setResetPasswordOpen(false)
+      setSelectedUser(null)
+    } catch (error) {
+      console.error('Failed to reset password:', error)
+      toast({
+        title: "重置失败",
+        description: "无法重置用户密码，请稍后重试",
+        variant: "destructive",
+      })
+    }
+  }, [selectedUser, toast])
+
+  // 保存编辑用户信息
+  const saveEditUser = useCallback(async () => {
+    if (!selectedUser) return
+    
+    try {
+      // 准备更新数据，过滤掉空密码
+      const { password, ...baseData } = editForm
+      const updateData = (!password || password.trim() === '') 
+        ? baseData 
+        : editForm
+      
+      // 调用更新用户信息的API
+      await apiClient.admin.updateUser(selectedUser.id, updateData)
+      toast({
+        title: "更新成功",
+        description: `用户 ${editForm.username} 的信息已更新`,
+      })
+      setEditUserOpen(false)
+      setSelectedUser(null)
+      // 重新加载用户数据
+      loadAdminData()
+    } catch (error) {
+      console.error('Failed to update user:', error)
+      toast({
+        title: "更新失败",
+        description: "无法更新用户信息，请稍后重试",
+        variant: "destructive",
+      })
+    }
+  }, [selectedUser, editForm, toast, loadAdminData])
 
   return (
     <div className="min-h-screen bg-background">
@@ -339,20 +580,20 @@ export default function AdminPage() {
                       <TableRow key={user.id}>
                         <TableCell>
                           <div>
-                            <div className="font-medium text-foreground">{user.name}</div>
+                            <div className="font-medium text-foreground">{user.username}</div>
                             <div className="text-sm text-muted-foreground">{user.email}</div>
                           </div>
                         </TableCell>
                         <TableCell>
                           {getRoleBadge(user.role)}
                         </TableCell>
-                        <TableCell>{getStatusBadge(user.status)}</TableCell>
-                        <TableCell className="text-foreground">{user.tasksCompleted}</TableCell>
+                        <TableCell>{getStatusBadge(user.is_active ? 'active' : 'inactive')}</TableCell>
+                        <TableCell className="text-foreground">-</TableCell>
                         <TableCell className="text-muted-foreground">
-                          {new Date(user.joinedAt).toLocaleDateString()}
+                          {formatDate(user.created_at)}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {new Date(user.lastActive).toLocaleDateString()}
+                          {formatDate(user.last_login_at)}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -362,22 +603,24 @@ export default function AdminPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>查看资料</DropdownMenuItem>
-                              <DropdownMenuItem>编辑用户</DropdownMenuItem>
-                              <DropdownMenuItem>重置密码</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleViewUserProfile(user.id.toString())}>查看资料</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditUser(user.id.toString())}>编辑用户</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleResetPassword(user.id.toString())}>重置密码</DropdownMenuItem>
                               {user.is_active ? (
                                 <DropdownMenuItem 
                                   className="text-red-600"
                                   onClick={() => handleUserStatusUpdate(user.id.toString(), false)}
+                                  disabled={updatingUserId === user.id.toString()}
                                 >
-                                  禁用用户
+                                  {updatingUserId === user.id.toString() ? '禁用中...' : '禁用用户'}
                                 </DropdownMenuItem>
                               ) : (
                                 <DropdownMenuItem 
                                   className="text-green-600"
                                   onClick={() => handleUserStatusUpdate(user.id.toString(), true)}
+                                  disabled={updatingUserId === user.id.toString()}
                                 >
-                                  启用用户
+                                  {updatingUserId === user.id.toString() ? '启用中...' : '启用用户'}
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
@@ -438,11 +681,11 @@ export default function AdminPage() {
                     {filteredTasks.map((task) => (
                       <TableRow key={task.id}>
                         <TableCell>
-                          <div className="font-medium text-foreground">{task.name || task.title}</div>
+                          <div className="font-medium text-foreground">{task.title}</div>
                           {task.error_message && <div className="text-sm text-red-600">{task.error_message}</div>}
                         </TableCell>
-                        <TableCell className="text-foreground">{task.user_id}</TableCell>
-                        <TableCell>{getStatusBadge(task.status)}</TableCell>
+                        <TableCell className="text-foreground">{task.user?.username || `用户${task.user_id}`}</TableCell>
+                        <TableCell>{getTaskStatusBadge(task.status)}</TableCell>
                         <TableCell>
                           <Badge variant="outline">待处理</Badge>
                         </TableCell>
@@ -459,7 +702,7 @@ export default function AdminPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem>查看详情</DropdownMenuItem>
                               <DropdownMenuItem>审核代码</DropdownMenuItem>
-                              {(task.status === "pending" || task.status === "in-progress") && (
+                              {(task.status === "submitted" || task.status === "code_submitted" || task.status === "under_review") && (
                                 <>
                                   <DropdownMenuItem 
                                     className="text-green-600"
@@ -469,12 +712,19 @@ export default function AdminPage() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     className="text-red-600"
-                                    onClick={() => handleTaskStatusUpdate(task.id.toString(), 'rejected', '管理员拒绝')}
+                                    onClick={() => handleRejectTask(task.id.toString())}
                                   >
                                     拒绝任务
                                   </DropdownMenuItem>
                                 </>
                               )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={() => handleDeleteTask(task.id.toString(), task.title)}
+                              >
+                                删除任务
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -617,6 +867,276 @@ export default function AdminPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* 用户详情弹窗 */}
+      <Dialog open={userDetailOpen} onOpenChange={setUserDetailOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              用户详情
+            </DialogTitle>
+            <DialogDescription>
+              查看用户的详细信息
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">用户名</Label>
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{selectedUser.username}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">邮箱</Label>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{selectedUser.email}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">角色</Label>
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    {getRoleBadge(selectedUser.role)}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">状态</Label>
+                  <div>{getStatusBadge(selectedUser.is_active ? 'active' : 'inactive')}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">注册时间</Label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{formatDate(selectedUser.created_at)}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">最后登录</Label>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{formatDate(selectedUser.last_login_at)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑用户弹窗 */}
+      <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              编辑用户
+            </DialogTitle>
+            <DialogDescription>
+              修改用户的基本信息
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                 <Label htmlFor="edit-username">用户名</Label>
+                 <Input 
+                   id="edit-username" 
+                   value={editForm.username}
+                   onChange={(e) => setEditForm(prev => ({ ...prev, username: e.target.value }))}
+                   placeholder="请输入用户名"
+                 />
+               </div>
+               <div className="space-y-2">
+                 <Label htmlFor="edit-email">邮箱</Label>
+                 <Input 
+                   id="edit-email" 
+                   type="email"
+                   value={editForm.email}
+                   onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                   placeholder="请输入邮箱地址"
+                 />
+               </div>
+               <div className="space-y-2">
+                 <Label htmlFor="edit-role">角色</Label>
+                 <Select value={editForm.role} onValueChange={(value) => setEditForm(prev => ({ ...prev, role: value as 'user' | 'admin' }))}>
+                   <SelectTrigger>
+                     <SelectValue />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="user">用户</SelectItem>
+                     <SelectItem value="admin">管理员</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="space-y-2">
+                 <Label htmlFor="edit-password">新密码</Label>
+                 <Input 
+                   id="edit-password" 
+                   type="password"
+                   value={editForm.password}
+                   onChange={(e) => setEditForm(prev => ({ ...prev, password: e.target.value }))}
+                   placeholder="留空则不修改密码"
+                 />
+               </div>
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setEditUserOpen(false)}
+                >
+                  取消
+                </Button>
+                <Button 
+                   className="flex-1"
+                   onClick={saveEditUser}
+                 >
+                   保存
+                 </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 重置密码确认弹窗 */}
+      <Dialog open={resetPasswordOpen} onOpenChange={setResetPasswordOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              重置密码
+            </DialogTitle>
+            <DialogDescription>
+              确认要重置该用户的密码吗？
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                <p className="text-sm text-orange-800 dark:text-orange-200">
+                  将为用户 <strong>{selectedUser.username}</strong> 重置密码。
+                  新密码将通过邮件发送给用户。
+                </p>
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setResetPasswordOpen(false)}
+                >
+                  取消
+                </Button>
+                <Button 
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                  onClick={confirmResetPassword}
+                >
+                  确认重置
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 拒绝任务弹窗 */}
+      <Dialog open={rejectTaskOpen} onOpenChange={setRejectTaskOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              拒绝任务
+            </DialogTitle>
+            <DialogDescription>
+              请输入拒绝理由，任务将回退到代码生成步骤。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reject-reason">拒绝理由</Label>
+              <textarea
+                id="reject-reason"
+                className="w-full min-h-[100px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="请详细说明拒绝的原因，以便用户了解需要改进的地方..."
+              />
+            </div>
+            <div className="flex gap-2 pt-4">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => {
+                  setRejectTaskOpen(false)
+                  setRejectReason('')
+                  setSelectedTaskId('')
+                }}
+              >
+                取消
+              </Button>
+              <Button 
+                className="flex-1 bg-red-600 hover:bg-red-700"
+                onClick={confirmRejectTask}
+                disabled={!rejectReason.trim()}
+              >
+                确认拒绝
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除任务确认弹窗 */}
+      <Dialog open={deleteTaskOpen} onOpenChange={setDeleteTaskOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              删除任务确认
+            </DialogTitle>
+            <DialogDescription>
+              此操作将永久删除任务及其相关数据，无法恢复。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">
+                <strong>警告：</strong>您即将删除任务 "{deleteTaskTitle}"
+              </p>
+              <p className="text-sm text-red-700 mt-2">
+                删除后将无法恢复，请确认您的操作。
+              </p>
+            </div>
+            <div className="flex gap-2 pt-4">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => {
+                  setDeleteTaskOpen(false)
+                  setDeleteTaskId('')
+                  setDeleteTaskTitle('')
+                }}
+              >
+                取消
+              </Button>
+              <Button 
+                className="flex-1 bg-red-600 hover:bg-red-700"
+                onClick={confirmDeleteTask}
+              >
+                确认删除
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

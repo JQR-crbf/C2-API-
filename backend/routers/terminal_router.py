@@ -248,24 +248,9 @@ async def list_terminal_sessions(
     db: Session = Depends(get_db)
 ):
     """获取当前用户的所有终端会话"""
-    # 验证用户身份
-    try:
-        payload = verify_token(credentials.credentials)
-        if payload is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        user_id = payload.get("user_id")
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-        
-        current_user = db.query(User).filter(User.id == int(user_id)).first()
-        if current_user is None or not current_user.is_active:
-            raise HTTPException(status_code=401, detail="User not found or inactive")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Authentication failed: {e}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
+    from routers.auth import get_current_user
+    
+    current_user = await get_current_user(credentials, db)
     
     try:
         terminal_manager = get_terminal_manager()
@@ -299,24 +284,9 @@ async def delete_terminal_session(
     db: Session = Depends(get_db)
 ):
     """删除指定的终端会话"""
-    # 验证用户身份
-    try:
-        payload = verify_token(credentials.credentials)
-        if payload is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        user_id = payload.get("user_id")
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-        
-        current_user = db.query(User).filter(User.id == int(user_id)).first()
-        if current_user is None or not current_user.is_active:
-            raise HTTPException(status_code=401, detail="User not found or inactive")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Authentication failed: {e}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
+    from routers.auth import get_current_user
+    
+    current_user = await get_current_user(credentials, db)
     
     try:
         terminal_manager = get_terminal_manager()
@@ -348,27 +318,12 @@ async def get_terminal_stats(
     db: Session = Depends(get_db)
 ):
     """获取终端系统统计信息（仅管理员）"""
-    # 验证用户身份
-    try:
-        payload = verify_token(credentials.credentials)
-        if payload is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        user_id = payload.get("user_id")
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-        
-        current_user = db.query(User).filter(User.id == int(user_id)).first()
-        if current_user is None or not current_user.is_active:
-            raise HTTPException(status_code=401, detail="User not found or inactive")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Authentication failed: {e}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
+    from routers.auth import get_current_user
+    
+    current_user = await get_current_user(credentials, db)
     
     # 检查管理员权限
-    if getattr(current_user, 'role', None) != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:

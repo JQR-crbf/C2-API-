@@ -13,12 +13,12 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  Download,
   Play,
-  Code,
   FileText,
   Activity,
   Eye,
+  MessageSquare,
+  Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { ProtectedRoute, useAuth } from "@/contexts/AuthContext"
@@ -26,15 +26,17 @@ import { tasks, admin, Task } from "@/lib/api"
 import { getProgressFromStatus, getStatusIcon, getStatusBadgeProps, getStatusText } from '@/lib/task-status'
 import { TaskWorkflow } from '@/components/task-workflow'
 import { GuidedDeployment } from '@/components/guided-deployment'
+import { useToast } from "@/components/ui/use-toast"
 
 
 
 function TaskDetailsContent() {
   const params = useParams()
   const { user } = useAuth()
+  const { toast } = useToast()
   const [task, setTask] = useState<Task | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isDownloading, setIsDownloading] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
   const taskId = params.id as string
 
   useEffect(() => {
@@ -53,6 +55,17 @@ function TaskDetailsContent() {
       } else {
         taskData = await tasks.getById(taskId)
       }
+      
+      // 获取任务日志
+      try {
+        const logs = await tasks.getLogs(taskId)
+        taskData.logs = logs
+      } catch (logError) {
+        console.warn('Failed to load task logs:', logError)
+        // 如果日志加载失败，设置为空数组，不影响主要功能
+        taskData.logs = []
+      }
+      
       setTask(taskData)
     } catch (error) {
       console.error('Failed to load task:', error)
@@ -61,26 +74,27 @@ function TaskDetailsContent() {
     }
   }
 
-  const handleDownload = async () => {
-    if (!task) return
-    
+  const handleGenerateCode = async () => {
     try {
-      setIsDownloading(true)
-      // 模拟下载功能
-      const blob = new Blob([task.generated_code || ''], { type: 'text/plain' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.style.display = 'none'
-      a.href = url
-      a.download = `${(task.name || task.title).replace(/\s+/g, '_')}_code.py`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-    } catch (error) {
-      console.error('Download failed:', error)
+      setIsGenerating(true)
+      await tasks.regenerateCode(taskId)
+      
+      toast({
+        title: "成功",
+        description: "代码生成步骤已完成",
+      })
+      
+      // 重新加载任务信息
+      await loadTask()
+    } catch (error: any) {
+      console.error('代码生成失败:', error)
+      toast({
+        title: "错误",
+        description: error.message || "代码生成步骤失败",
+        variant: "destructive",
+      })
     } finally {
-      setIsDownloading(false)
+      setIsGenerating(false)
     }
   }
 
@@ -90,17 +104,20 @@ function TaskDetailsContent() {
 
 
 
-  const getLogLevelColor = (level: string) => {
-    switch (level) {
-      case "success":
-        return "text-green-600"
-      case "error":
-        return "text-red-600"
-      case "warning":
-        return "text-yellow-600"
-      default:
-        return "text-blue-600"
+
+
+  // 获取操作类型的中文显示
+  const getActionTypeText = (actionType: string) => {
+    const actionTypeMap: { [key: string]: string } = {
+      'create_task': '创建任务',
+      'generate_code': '生成代码',
+      'submit_code': '代码提交',
+      'admin_review': '管理员审核',
+      'deploy': '部署完成',
+      'approve': '审核通过',
+      'reject': '审核拒绝'
     }
+    return actionTypeMap[actionType] || actionType
   }
 
   if (isLoading) {
@@ -154,15 +171,6 @@ function TaskDetailsContent() {
               <Eye className="h-4 w-4 mr-2" />
               测试API
             </Button>
-            <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleDownload}
-                disabled={isDownloading || !task?.generated_code}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {isDownloading ? '下载中...' : '下载代码'}
-              </Button>
           </div>
         </div>
       </header>
@@ -214,7 +222,7 @@ function TaskDetailsContent() {
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="progress">进度</TabsTrigger>
             <TabsTrigger value="code">生成代码</TabsTrigger>
-            <TabsTrigger value="logs">执行日志</TabsTrigger>
+            <TabsTrigger value="logs">操作日志</TabsTrigger>
             <TabsTrigger value="testing">测试</TabsTrigger>
             <TabsTrigger value="deployment">引导部署</TabsTrigger>
           </TabsList>
@@ -227,30 +235,55 @@ function TaskDetailsContent() {
           </TabsContent>
 
           <TabsContent value="code" className="space-y-4">
+            {/* Generate Code Button */}
+            {task.status === 'submitted' && (
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bot className="h-5 w-5 text-primary" />
+                    代码生成步骤
+                  </CardTitle>
+                  <CardDescription>点击按钮完成代码生成步骤记录</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button 
+                    onClick={handleGenerateCode}
+                    disabled={isGenerating}
+                    className="w-full"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        正在记录步骤...
+                      </>
+                    ) : (
+                      <>
+                        <Bot className="h-4 w-4 mr-2" />
+                        完成代码生成步骤
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Dify AI Chat Section */}
             <Card className="border-border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Code className="h-5 w-5 text-primary" />
-                  生成的代码
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  AI助手聊天
                 </CardTitle>
-                <CardDescription>AI为您的API生成的代码（预览）</CardDescription>
+                <CardDescription>与AI助手讨论您的API需求和实现方案</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-                  <pre className="text-sm text-gray-100">
-                    <code>{task.generated_code || '代码生成中...'}</code>
-                  </pre>
-                </div>
-                <div className="flex justify-end mt-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleDownload}
-                    disabled={isDownloading || !task.generated_code}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    {isDownloading ? '下载中...' : '下载完整代码'}
-                  </Button>
+              <CardContent className="p-0">
+                <div className="w-full h-[600px] border rounded-lg overflow-hidden">
+                  <iframe
+                    src="https://udify.app/chat/FPrQeaMIhm0OgPiQ"
+                    className="w-full h-full border-0"
+                    title="Dify AI Chat"
+                    allow="microphone; camera"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -260,26 +293,47 @@ function TaskDetailsContent() {
             <Card className="border-border">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  执行日志
+                  <Activity className="h-5 w-5 text-primary" />
+                  操作日志
                 </CardTitle>
-                <CardDescription>API生成过程的实时日志</CardDescription>
+                <CardDescription>任务的所有操作记录</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="space-y-3 max-h-96 overflow-y-auto">
                   {task.logs && task.logs.length > 0 ? task.logs.map((log: any, index: number) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                      <div className="text-xs text-muted-foreground mt-1 min-w-[80px]">
-                        {new Date(log.timestamp).toLocaleTimeString('zh-CN')}
+                    <div key={index} className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg border">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Activity className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(log.created_at).toLocaleTimeString('zh-CN', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </div>
                       </div>
-                      <div className={`text-xs font-medium uppercase min-w-[60px] ${getLogLevelColor(log.level)}`}>
-                        {log.level}
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">
+                            {log.user_name || '系统'}
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {getActionTypeText(log.action_type)}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {log.message}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(log.created_at).toLocaleDateString('zh-CN')}
+                        </div>
                       </div>
-                      <div className="text-sm text-foreground flex-1">{log.message}</div>
                     </div>
                   )) : (
                     <div className="text-center text-muted-foreground py-8">
-                      暂无日志记录
+                      <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>暂无操作记录</p>
                     </div>
                   )}
                 </div>
@@ -299,14 +353,14 @@ function TaskDetailsContent() {
               <CardContent className="space-y-4">
                 <div className="p-4 bg-muted rounded-lg text-center">
                   <p className="text-muted-foreground mb-4">
-                    {task.status === 'completed' ? 
+                    {task.status === 'deployed' ? 
                       'API已生成完成，您可以开始测试。' : 
                       '您的API正在生成中。代码生成完成后将可进行测试。'
                     }
                   </p>
-                  <Button disabled={task.status !== 'completed'}>
+                  <Button disabled={task.status !== 'deployed'}>
                     <Play className="h-4 w-4 mr-2" />
-                    {task.status === 'completed' ? '测试API' : '测试API（即将推出）'}
+                    {task.status === 'deployed' ? '测试API' : '测试API（即将推出）'}
                   </Button>
                 </div>
               </CardContent>

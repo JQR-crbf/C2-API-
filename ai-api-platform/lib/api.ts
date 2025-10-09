@@ -30,13 +30,14 @@ export interface AuthResponse {
 
 // 通知相关类型
 export interface Notification {
-  id: string
-  type: 'success' | 'info' | 'warning' | 'error'
-  message: string
-  title?: string
+  id: number
+  title: string
+  content?: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  user_id: number
+  task_id?: number
+  is_read: boolean
   created_at: string
-  read: boolean
-  user_id: string
 }
 
 export interface CreateNotificationRequest {
@@ -60,7 +61,8 @@ export interface Task {
   title: string  // 改为title以匹配后端
   name?: string  // 兼容字段
   description: string
-  status: 'pending' | 'in-progress' | 'completed' | 'failed' | 'testing'
+  status: 'submitted' | 'ai_generating' | 'test_ready' | 'code_submitted' | 'under_review' | 'deployed' | 'approved' | 'rejected'
+  priority: 'high' | 'medium' | 'low'  // 任务优先级
   progress?: number  // 可选字段
   language?: string
   framework?: string
@@ -112,6 +114,14 @@ export interface User {
   is_active: boolean
   created_at: string
   full_name?: string
+}
+
+// 用户更新请求类型
+export interface UserUpdateRequest {
+  username?: string
+  email?: string
+  role?: 'user' | 'admin'
+  password?: string
 }
 
 // API客户端类
@@ -246,6 +256,10 @@ class APIClient {
     return this.request<Task>(`/api/tasks/${taskId}`)
   }
 
+  async getTaskLogs(taskId: string): Promise<any[]> {
+    return this.request<any[]>(`/api/tasks/${taskId}/logs`)
+  }
+
   async deleteTask(taskId: string): Promise<void> {
     return this.request<void>(`/api/tasks/${taskId}`, {
       method: 'DELETE',
@@ -273,7 +287,7 @@ class APIClient {
     return this.request<User[]>('/api/admin/users')
   }
 
-  async updateUser(userId: string, userData: Partial<User>): Promise<User> {
+  async updateUser(userId: number, userData: UserUpdateRequest): Promise<User> {
     return this.request<User>(`/api/admin/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(userData),
@@ -325,6 +339,51 @@ class APIClient {
       method: 'DELETE',
     })
   }
+
+  // 管理员相关方法
+  async getAdminTasks(): Promise<any> {
+    return this.request<any>('/api/admin/tasks')
+  }
+
+  async getAdminTask(taskId: string): Promise<Task> {
+    return this.request<Task>(`/api/admin/tasks/${taskId}`)
+  }
+
+  async updateAdminTaskStatus(taskId: string, data: any): Promise<any> {
+    return this.request<any>(`/api/admin/tasks/${taskId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateAdminUserStatus(userId: string, isActive: boolean): Promise<any> {
+    return this.request<any>(`/api/admin/users/${userId}/status?is_active=${isActive}`, {
+      method: 'PUT',
+    })
+  }
+
+  async sendAdminNotification(data: any): Promise<any> {
+    return this.request<any>('/api/admin/notifications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async reviewAdminTask(taskId: string, action: 'approve' | 'reject', comment?: string): Promise<any> {
+    const params = new URLSearchParams({ action });
+    if (comment) {
+      params.append('comment', comment);
+    }
+    return this.request<any>(`/api/admin/tasks/${taskId}/review?${params.toString()}`, {
+      method: 'POST',
+    });
+  }
+
+  async regenerateTaskCode(id: string): Promise<any> {
+    return this.request<any>(`/api/tasks/${id}/regenerate`, {
+      method: 'POST',
+    })
+  }
 }
 
 // 创建全局API客户端实例
@@ -334,8 +393,10 @@ class EnhancedAPIClient extends APIClient {
     create: (taskData: CreateTaskRequest) => this.createTask(taskData),
     getAll: () => this.getTasks(),
     getById: (id: string) => this.getTask(id),
+    getLogs: (id: string) => this.getTaskLogs(id),
     delete: (id: string) => this.deleteTask(id),
     downloadCode: (id: string) => this.downloadTaskCode(id),
+    regenerateCode: (id: string) => this.regenerateTaskCode(id),
   }
 
   // 认证相关API
@@ -361,22 +422,15 @@ class EnhancedAPIClient extends APIClient {
 
   admin = {
     getUsers: () => this.getUsers(),
-    updateUser: (id: string, data: Partial<User>) => this.updateUser(id, data),
+    updateUser: (id: number, data: UserUpdateRequest) => this.updateUser(id, data),
     deleteUser: (id: string) => this.deleteUser(id),
     getStats: () => this.getSystemStats(),
-    getTasks: () => this.request<any>('/api/admin/tasks'),
-    getTask: (taskId: string) => this.request<Task>(`/api/admin/tasks/${taskId}`),
-    updateTaskStatus: (taskId: string, data: any) => this.request<any>(`/api/admin/tasks/${taskId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-    updateUserStatus: (userId: string, isActive: boolean) => this.request<any>(`/api/admin/users/${userId}/status?is_active=${isActive}`, {
-      method: 'PUT',
-    }),
-    sendNotification: (data: any) => this.request<any>('/api/admin/notifications', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    getTasks: () => this.getAdminTasks(),
+    getTask: (taskId: string) => this.getAdminTask(taskId),
+    updateTaskStatus: (taskId: string, data: any) => this.updateAdminTaskStatus(taskId, data),
+    updateUserStatus: (userId: string, isActive: boolean) => this.updateAdminUserStatus(userId, isActive),
+    sendNotification: (data: any) => this.sendAdminNotification(data),
+    reviewTask: (taskId: string, action: 'approve' | 'reject', comment?: string) => this.reviewAdminTask(taskId, action, comment),
   }
 }
 
@@ -394,8 +448,10 @@ export const tasks = {
   create: (taskData: CreateTaskRequest) => apiClient.createTask(taskData),
   getAll: () => apiClient.getTasks(),
   getById: (id: string) => apiClient.getTask(id),
+  getLogs: (id: string) => apiClient.getTaskLogs(id),
   delete: (id: string) => apiClient.deleteTask(id),
   downloadCode: (id: string) => apiClient.downloadTaskCode(id),
+  regenerateCode: (id: string) => apiClient.regenerateTaskCode(id),
 }
 
 export const testing = {
@@ -411,12 +467,15 @@ export const notifications = {
 
 export const admin = {
   getUsers: () => apiClient.getUsers(),
-  updateUser: (id: string, data: Partial<User>) => apiClient.updateUser(id, data),
+  updateUser: (id: number, data: UserUpdateRequest) => apiClient.updateUser(id, data),
   deleteUser: (id: string) => apiClient.deleteUser(id),
   getStats: () => apiClient.getSystemStats(),
-  getTasks: () => apiClient.admin.getTasks(),
-  getTask: (taskId: string) => apiClient.admin.getTask(taskId),
-  updateTaskStatus: (taskId: string, data: any) => apiClient.admin.updateTaskStatus(taskId, data),
+  getTasks: () => apiClient.getAdminTasks(),
+  getTask: (taskId: string) => apiClient.getAdminTask(taskId),
+  updateTaskStatus: (taskId: string, data: any) => apiClient.updateAdminTaskStatus(taskId, data),
+  deleteTask: (taskId: string) => apiClient.deleteTask(taskId),
+  updateUserStatus: (userId: string, isActive: boolean) => apiClient.updateAdminUserStatus(userId, isActive),
+  reviewTask: (taskId: string, action: 'approve' | 'reject', comment?: string) => apiClient.reviewAdminTask(taskId, action, comment),
 }
 
 export default apiClient

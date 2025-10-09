@@ -21,7 +21,7 @@ import {
   LogOut,
 } from "lucide-react"
 import { useAuth, ProtectedRoute } from "@/contexts/AuthContext"
-import { tasks, admin, Task } from "@/lib/api"
+import { tasks, admin, notifications, Task, Notification } from "@/lib/api"
 import Link from "next/link"
 import { getProgressFromStatus, getStatusIcon, getStatusBadgeProps, getStatusText, categorizeTasksByStatus } from '@/lib/task-status'
 
@@ -38,7 +38,7 @@ const mockRecentTasks = [
   {
     id: 1,
     name: "用户认证API",
-    status: "completed",
+    status: "deployed",
     progress: 100,
     createdAt: "2小时前",
     description: "创建登录和注册端点",
@@ -46,7 +46,7 @@ const mockRecentTasks = [
   {
     id: 2,
     name: "产品目录API",
-    status: "in-progress",
+    status: "under_review",
     progress: 65,
     createdAt: "4小时前",
     description: "产品管理的CRUD操作",
@@ -54,7 +54,7 @@ const mockRecentTasks = [
   {
     id: 3,
     name: "支付处理API",
-    status: "in-progress",
+    status: "code_submitted",
     progress: 30,
     createdAt: "6小时前",
     description: "与支付网关集成",
@@ -62,42 +62,42 @@ const mockRecentTasks = [
   {
     id: 4,
     name: "邮件通知API",
-    status: "failed",
+    status: "rejected",
     progress: 0,
     createdAt: "1天前",
     description: "发送自动邮件通知",
   },
 ]
 
-const mockNotifications = [
-  {
-    id: 1,
-    type: "success",
-    message: "用户认证API部署成功",
-    time: "10分钟前",
-  },
-  {
-    id: 2,
-    type: "info",
-    message: "产品目录API已准备好测试",
-    time: "1小时前",
-  },
-  {
-    id: 3,
-    type: "warning",
-    message: "支付处理API需要审查",
-    time: "2小时前",
-  },
-]
+// 格式化时间显示
+function formatTimeAgo(dateString: string): string {
+  const now = new Date()
+  const date = new Date(dateString)
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+  
+  if (diffInMinutes < 1) return '刚刚'
+  if (diffInMinutes < 60) return `${diffInMinutes}分钟前`
+  
+  const diffInHours = Math.floor(diffInMinutes / 60)
+  if (diffInHours < 24) return `${diffInHours}小时前`
+  
+  const diffInDays = Math.floor(diffInHours / 24)
+  if (diffInDays < 7) return `${diffInDays}天前`
+  
+  return date.toLocaleDateString('zh-CN')
+}
 
 function DashboardContent() {
   const { user, logout } = useAuth()
   const [userTasks, setUserTasks] = useState<Task[]>([])
+  const [userNotifications, setUserNotifications] = useState<Notification[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
 
   useEffect(() => {
     if (user) {
       loadTasks()
+      loadNotifications()
     }
   }, [user])
 
@@ -124,6 +124,20 @@ function DashboardContent() {
       setUserTasks([])
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadNotifications = async () => {
+    try {
+      setNotificationsLoading(true)
+      const notificationsData = await notifications.getAll()
+      // 只显示最新的3条通知
+      const recentNotifications = notificationsData.slice(0, 3)
+      setUserNotifications(recentNotifications)
+    } catch (error) {
+      console.error('Failed to load notifications:', error)
+    } finally {
+      setNotificationsLoading(false)
     }
   }
 
@@ -345,27 +359,39 @@ function DashboardContent() {
                 <CardDescription>最新更新和提醒</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {mockNotifications.map((notification) => (
-                  <div key={notification.id} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                    <div
-                      className={`p-1 rounded-full ${
-                        notification.type === "success"
-                          ? "bg-green-100"
-                          : notification.type === "warning"
-                            ? "bg-yellow-100"
-                            : "bg-blue-100"
+                {notificationsLoading ? (
+                  <div className="text-center py-4 text-muted-foreground">加载中...</div>
+                ) : userNotifications.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground">暂无通知</div>
+                ) : (
+                  userNotifications.map((notification) => (
+                    <div key={notification.id} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                      <div
+                        className={`p-1 rounded-full ${
+                          notification.type === "success"
+                            ? "bg-green-100"
+                            : notification.type === "warning"
+                              ? "bg-yellow-100"
+                              : notification.type === "error"
+                                ? "bg-red-100"
+                                : "bg-blue-100"
                       }`}
                     >
-                      {notification.type === "success" && <CheckCircle className="h-3 w-3 text-green-600" />}
-                      {notification.type === "warning" && <AlertCircle className="h-3 w-3 text-yellow-600" />}
-                      {notification.type === "info" && <Activity className="h-3 w-3 text-blue-600" />}
+                        {notification.type === "success" && <CheckCircle className="h-3 w-3 text-green-600" />}
+                        {notification.type === "warning" && <AlertCircle className="h-3 w-3 text-yellow-600" />}
+                        {notification.type === "error" && <AlertCircle className="h-3 w-3 text-red-600" />}
+                        {notification.type === "info" && <Activity className="h-3 w-3 text-blue-600" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground font-medium">{notification.title}</p>
+                        {notification.content && (
+                          <p className="text-sm text-muted-foreground mt-1">{notification.content}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">{formatTimeAgo(notification.created_at)}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-foreground">{notification.message}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{notification.time}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
                 <Link href="/notifications">
                   <Button variant="outline" className="w-full bg-transparent">
                     查看所有通知

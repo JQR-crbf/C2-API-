@@ -703,6 +703,7 @@ class AICodeGenerationService:
         """添加任务日志"""
         task_log = TaskLog(
             task_id=task_id,
+            action_type="ai_generation",
             status=status.value,
             message=message
         )

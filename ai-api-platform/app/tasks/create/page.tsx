@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Bot, ArrowLeft, Upload, Zap, Code, Database, Shield, FileText } from "lucide-react"
+import { Bot, ArrowLeft, Upload, Zap, Code, Database, Shield, FileText, Copy } from "lucide-react"
 import { useAuth, ProtectedRoute } from "@/contexts/AuthContext"
 import { apiClient } from "@/lib/api"
 import { useRouter } from "next/navigation"
@@ -24,12 +24,14 @@ function CreateTaskContent() {
     language: "",
     framework: "",
     database: "",
+    priority: "medium",
     authentication: false,
     fileUpload: false,
     apiDocumentation: true,
     testCases: true,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [jsonOutput, setJsonOutput] = useState<string | null>(null)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,18 +51,49 @@ function CreateTaskContent() {
         language: formData.language || 'python',
         framework: formData.framework || 'fastapi',
         database: formData.database || 'mysql',
+        priority: formData.priority,
+        features,
+        created_at: new Date().toISOString(),
+        task_type: 'api_development'
+      }
+      
+      // 生成并显示JSON
+      const jsonString = JSON.stringify(taskData, null, 2)
+      setJsonOutput(jsonString)
+      
+      // 创建API任务（不生成代码）
+      const apiTaskData = {
+        name: formData.name,
+        description: formData.description,
+        language: formData.language || 'python',
+        framework: formData.framework || 'fastapi',
+        database: formData.database || 'mysql',
+        priority: formData.priority,
         features,
       }
       
-      const newTask = await apiClient.tasks.create(taskData)
-      toast.success('API任务创建成功！')
-      router.push(`/tasks/${newTask.id}`)
+      const newTask = await apiClient.tasks.create(apiTaskData)
+      toast.success('任务JSON已生成，API任务已创建！')
+      
+      // 可选：跳转到任务详情页面
+      // router.push(`/tasks/${newTask.id}`)
     } catch (error) {
-      const message = error instanceof Error ? error.message : '创建任务失败'
+      const message = error instanceof Error ? error.message : '操作失败'
       toast.error(message)
       console.error('Failed to create task:', error)
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const copyToClipboard = async () => {
+    if (jsonOutput) {
+      try {
+        await navigator.clipboard.writeText(jsonOutput)
+        toast.success('JSON已复制到剪贴板！')
+      } catch (error) {
+        toast.error('复制失败，请手动复制')
+      }
     }
   }
 
@@ -94,7 +127,7 @@ function CreateTaskContent() {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-foreground">创建新API任务</h1>
           <p className="text-muted-foreground">
-            用自然语言描述您的API需求，让AI为您生成代码
+            填写API需求信息，创建API任务并生成JSON格式汇总，与AI助手讨论实现方案
           </p>
         </div>
 
@@ -133,6 +166,22 @@ function CreateTaskContent() {
                 />
                 <p className="text-sm text-muted-foreground">
                   您的描述越详细，AI就能更好地理解您的需求。
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="priority">任务优先级</Label>
+                <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
+                  <SelectTrigger className="bg-input border-border">
+                    <SelectValue placeholder="选择优先级" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">高优先级</SelectItem>
+                    <SelectItem value="medium">中优先级</SelectItem>
+                    <SelectItem value="low">低优先级</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  高优先级任务将优先处理。
                 </p>
               </div>
             </CardContent>
@@ -272,7 +321,7 @@ function CreateTaskContent() {
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  正在创建API任务...
+                  正在创建任务...
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -283,6 +332,37 @@ function CreateTaskContent() {
             </Button>
           </div>
         </form>
+
+        {/* JSON Output Section */}
+        {jsonOutput && (
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Code className="h-5 w-5 text-primary" />
+                  生成的任务JSON
+                </div>
+                <Button
+                  onClick={copyToClipboard}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Copy className="h-4 w-4" />
+                  复制JSON
+                </Button>
+              </CardTitle>
+              <CardDescription>您可以复制此JSON用于其他用途</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
+                <code>{jsonOutput}</code>
+              </pre>
+            </CardContent>
+          </Card>
+        )}
+
+
 
         {/* Help Section */}
         <Card className="border-border bg-muted/50">

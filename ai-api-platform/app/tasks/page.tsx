@@ -25,7 +25,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { apiClient, Task, admin, tasks } from "@/lib/api"
 import { toast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/AuthContext"
-import { getStatusBadgeProps } from "@/lib/task-status"
+import { getStatusBadgeProps, categorizeTasksByStatus } from "@/lib/task-status"
 
 export default function TasksPage() {
   const { user } = useAuth()
@@ -33,6 +33,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [priorityFilter, setPriorityFilter] = useState("all")
   const [sortBy, setSortBy] = useState("newest")
 
    // Helper function to get progress from status
@@ -155,6 +156,19 @@ export default function TasksPage() {
     }
   }
 
+  const getPriorityBadgeProps = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case "high":
+        return { variant: "destructive" as const, children: "高优先级" }
+      case "medium":
+        return { variant: "secondary" as const, children: "中优先级" }
+      case "low":
+        return { variant: "outline" as const, children: "低优先级" }
+      default:
+        return { variant: "secondary" as const, children: "中优先级" }
+    }
+  }
+
 
 
   // Ensure tasks is always an array before filtering
@@ -167,8 +181,33 @@ export default function TasksPage() {
       const matchesSearch =
         taskTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
         taskDescription.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesStatus = statusFilter === "all" || task.status === statusFilter
-      return matchesSearch && matchesStatus
+      
+      // 使用与控制台页面相同的状态分类逻辑
+      let matchesStatus = true
+      if (statusFilter !== "all") {
+        const taskCategories = categorizeTasksByStatus([task])
+        switch (statusFilter) {
+          case "completed":
+            matchesStatus = taskCategories.completed.length > 0
+            break
+          case "in-progress":
+            matchesStatus = taskCategories.inProgress.length > 0
+            break
+          case "pending":
+            matchesStatus = taskCategories.pending.length > 0
+            break
+          case "failed":
+            matchesStatus = taskCategories.failed.length > 0
+            break
+          default:
+            matchesStatus = true
+        }
+      }
+      
+      // 优先级筛选
+      const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter
+      
+      return matchesSearch && matchesStatus && matchesPriority
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -189,12 +228,15 @@ export default function TasksPage() {
       }
     })
 
+  // 使用与控制台页面相同的分类逻辑
+  const { completed, inProgress, pending, failed } = categorizeTasksByStatus(tasksArray)
+  
   const statusCounts = {
     all: tasksArray.length,
-    completed: tasksArray.filter((t) => t.status === "completed").length,
-    "in-progress": tasksArray.filter((t) => t.status === "in-progress").length,
-    failed: tasksArray.filter((t) => t.status === "failed").length,
-    pending: tasksArray.filter((t) => t.status === "pending").length,
+    completed: completed.length,
+    "in-progress": inProgress.length,
+    failed: failed.length,
+    pending: pending.length,
   }
 
   return (
@@ -289,6 +331,18 @@ export default function TasksPage() {
               <SelectItem value="failed">失败</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="w-full sm:w-[180px] bg-input border-border">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="按优先级筛选" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">所有优先级</SelectItem>
+              <SelectItem value="high">高优先级</SelectItem>
+              <SelectItem value="medium">中优先级</SelectItem>
+              <SelectItem value="low">低优先级</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-full sm:w-[180px] bg-input border-border">
               <SelectValue placeholder="排序方式" />
@@ -337,6 +391,7 @@ export default function TasksPage() {
                           <h3 className="text-lg font-semibold text-foreground truncate">{task.title || task.name}</h3>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge {...getStatusBadgeProps(task.status)} />
+                            {task.priority && <Badge {...getPriorityBadgeProps(task.priority)} />}
                           </div>
                         </div>
                       </div>
@@ -354,13 +409,13 @@ export default function TasksPage() {
                               <Eye className="h-4 w-4 mr-2" />
                               查看详情
                             </DropdownMenuItem>
-                            {task.status === "completed" && (
+                            {task.status === "deployed" && (
                               <DropdownMenuItem onClick={() => handleDownload(task.id)}>
                                 <Download className="h-4 w-4 mr-2" />
                                 下载代码
                               </DropdownMenuItem>
                             )}
-                            {task.status === "failed" && (
+                            {task.status === "rejected" && (
                               <DropdownMenuItem>
                                 <Clock className="h-4 w-4 mr-2" />
                                 重试任务
@@ -375,7 +430,7 @@ export default function TasksPage() {
                     <p className="text-muted-foreground break-words">{task.description}</p>
 
                     {/* Progress Bar */}
-                    {task.status === "in-progress" && (
+                    {(task.status === "ai_generating" || task.status === "code_submitted" || task.status === "under_review") && (
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm text-muted-foreground">进度</span>
@@ -386,7 +441,7 @@ export default function TasksPage() {
                     )}
 
                     {/* Error Message */}
-                    {task.status === "failed" && task.admin_comment && (
+                    {task.status === "rejected" && task.admin_comment && (
                       <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-sm text-red-800 break-words">{task.admin_comment}</p>
                       </div>

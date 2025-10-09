@@ -59,7 +59,7 @@ function APITestingContent() {
     try {
       const tasksResponse = await apiClient.tasks.getAll()
       const tasksData = Array.isArray(tasksResponse) ? tasksResponse : []
-      const completedTasks = tasksData.filter((task: Task) => task.status === 'completed')
+      const completedTasks = tasksData.filter((task: Task) => task.status === 'deployed')
       setUserTasks(completedTasks)
       if (completedTasks.length > 0) {
         setSelectedTask(completedTasks[0])
@@ -76,7 +76,8 @@ function APITestingContent() {
           name: '用户管理API',
           title: '用户管理API',
           description: '用户注册、登录、信息管理',
-          status: 'completed' as const,
+          status: 'deployed' as const,
+          priority: 'medium' as const,
           progress: 100,
           language: 'Python',
           framework: 'FastAPI',

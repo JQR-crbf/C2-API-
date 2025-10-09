@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Optional
 from database import get_db
-from models import Task, User, TaskLog, Notification, TaskStatus, NotificationType, DeploymentSession, DeploymentStep
+from models import Task, User, TaskLog, Notification, TaskStatus, NotificationType, TaskPriority, DeploymentSession, DeploymentStep
 from schemas import (
     TaskCreate, TaskResponse, TaskUpdate, TaskListResponse,
     TaskLogResponse, MessageResponse, DeploymentSessionCreate,
@@ -21,10 +21,6 @@ from services.ssh_manager import ssh_manager
 import zipfile
 import io
 import os
-import asyncio
-import logging
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tasks", tags=["任务管理"])
 
@@ -49,7 +45,8 @@ async def create_task(
         description=task_data.description,
         input_params=tech_stack,  # 将技术栈信息存储在input_params中
         output_params=None,
-        status=TaskStatus.SUBMITTED
+        status=TaskStatus.SUBMITTED,
+        priority=task_data.priority
     )
     
     db.add(new_task)
@@ -59,6 +56,8 @@ async def create_task(
     # 创建任务日志
     task_log = TaskLog(
         task_id=new_task.id,
+        user_id=current_user.id,
+        action_type="create_task",
         status=TaskStatus.SUBMITTED.value,
         message="任务已提交，等待处理"
     )
@@ -76,8 +75,8 @@ async def create_task(
     
     db.commit()
     
-    # 自动触发AI代码生成（异步执行，不阻塞响应）
-    asyncio.create_task(trigger_ai_generation(new_task.id))
+    # 注释掉自动触发AI代码生成，改为手动聊天生成
+    # asyncio.create_task(trigger_ai_generation(new_task.id))
     
     # 返回任务信息
     return TaskResponse(
@@ -88,6 +87,7 @@ async def create_task(
         input_params=new_task.input_params,
         output_params=new_task.output_params,
         status=new_task.status,
+        priority=new_task.priority,
         branch_name=new_task.branch_name,
         generated_code=new_task.generated_code,
         test_cases=new_task.test_cases,
@@ -104,6 +104,7 @@ async def get_tasks(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(10, ge=1, le=100, description="每页数量"),
     status: Optional[TaskStatus] = Query(None, description="任务状态筛选"),
+    priority: Optional[TaskPriority] = Query(None, description="任务优先级筛选"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -112,6 +113,9 @@ async def get_tasks(
     
     if status:
         query = query.filter(Task.status == status)
+    
+    if priority:
+        query = query.filter(Task.priority == priority)
     
     # 计算总数
     total = query.count()
@@ -129,6 +133,7 @@ async def get_tasks(
             input_params=task.input_params,
             output_params=task.output_params,
             status=task.status,
+            priority=task.priority,
             branch_name=task.branch_name,
             generated_code=task.generated_code,
             test_cases=task.test_cases,
@@ -173,6 +178,7 @@ async def get_task(
         input_params=task.input_params,
         output_params=task.output_params,
         status=task.status,
+        priority=task.priority,
         branch_name=task.branch_name,
         generated_code=task.generated_code,
         test_cases=task.test_cases,
@@ -190,29 +196,38 @@ async def get_task_logs(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """获取指定任务的日志记录"""
-    # 验证任务是否属于当前用户
-    task = db.query(Task).filter(
-        Task.id == task_id,
-        Task.user_id == current_user.id
-    ).first()
-    
+    """获取指定任务的操作日志记录"""
+    # 验证任务是否存在且用户有权限查看
+    task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="任务不存在"
         )
     
-    logs = db.query(TaskLog).filter(
+    # 检查权限：任务创建者或管理员可以查看
+    if current_user.role.value != 'admin' and task.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="无权限查看此任务日志"
+        )
+    
+    # 获取日志并关联用户信息
+    logs = db.query(TaskLog, User.username).outerjoin(
+        User, TaskLog.user_id == User.id
+    ).filter(
         TaskLog.task_id == task_id
-    ).order_by(TaskLog.created_at).all()
+    ).order_by(TaskLog.created_at.desc()).all()
     
     return [TaskLogResponse(
-        id=log.id,
-        task_id=log.task_id,
-        status=log.status,
-        message=log.message,
-        created_at=log.created_at
+        id=log.TaskLog.id,
+        task_id=log.TaskLog.task_id,
+        user_id=log.TaskLog.user_id,
+        action_type=log.TaskLog.action_type,
+        status=log.TaskLog.status,
+        message=log.TaskLog.message,
+        created_at=log.TaskLog.created_at,
+        user_name=log.username if log.username else "系统"
     ) for log in logs]
 
 @router.get("/{task_id}/workflow", summary="获取任务工作流程信息")
@@ -281,7 +296,7 @@ async def mark_action_completed(
         raise HTTPException(status_code=403, detail="无权操作此任务")
     
     workflow_service = TaskWorkflowService(db)
-    success = workflow_service.mark_action_completed(task, action, message)
+    success = workflow_service.mark_action_completed(task, action, message, current_user)
     
     if not success:
         raise HTTPException(status_code=500, detail="标记操作完成失败")
@@ -401,13 +416,13 @@ python-multipart>=0.0.5
     )
 
 
-@router.post("/{task_id}/regenerate", response_model=MessageResponse, summary="重新生成代码")
+@router.post("/{task_id}/regenerate", response_model=MessageResponse, summary="代码生成步骤")
 async def regenerate_task_code(
     task_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """重新生成任务代码"""
+    """代码生成步骤记录"""
     # 获取任务
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -416,85 +431,44 @@ async def regenerate_task_code(
             detail="任务不存在"
         )
     
-    # 检查权限：只有任务创建者或管理员可以重新生成
+    # 检查权限：只有任务创建者或管理员可以操作
     if task.user_id != current_user.id and current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="无权限操作此任务"
         )
     
-    # 检查任务状态：只有特定状态的任务才能重新生成
-    allowed_statuses = [TaskStatus.SUBMITTED, TaskStatus.AI_GENERATING, TaskStatus.TEST_READY, TaskStatus.TESTING]
-    if task.status not in allowed_statuses:
+    # 检查任务状态：只有已提交的任务才能进行代码生成步骤
+    if task.status != TaskStatus.SUBMITTED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"任务状态为 {task.status.value}，无法重新生成代码"
+            detail=f"任务状态为 {task.status.value}，无法进行代码生成步骤"
         )
     
     try:
-        # 重置任务状态
-        task.status = TaskStatus.SUBMITTED
-        task.generated_code = None
-        task.test_cases = None
+        # 更新任务状态为测试准备就绪（跳过AI生成，直接到下一步）
+        task.status = TaskStatus.TEST_READY
         
-        # 添加重新生成日志
+        # 添加代码生成步骤日志
         task_log = TaskLog(
             task_id=task_id,
-            status=TaskStatus.SUBMITTED.value,
-            message=f"用户 {current_user.username} 触发重新生成代码"
+            action_type="code_generated",
+            status=TaskStatus.TEST_READY.value,
+            message=f"用户 {current_user.username} 完成代码生成步骤"
         )
         db.add(task_log)
         db.commit()
         
-        # 异步触发AI代码生成
-        asyncio.create_task(trigger_ai_generation(task_id))
-        
-        return MessageResponse(message="已触发重新生成代码，请稍后查看结果")
+        return MessageResponse(message="代码生成步骤已完成")
         
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"重新生成代码失败: {str(e)}"
+            detail=f"代码生成步骤失败: {str(e)}"
         )
 
 
-async def trigger_ai_generation(task_id: int):
-    """异步触发AI代码生成"""
-    # 创建新的数据库会话，避免跨线程使用同一个Session
-    db = next(get_db())
-    try:
-        # 获取任务
-        task = db.query(Task).filter(Task.id == task_id).first()
-        if not task:
-            return
-        
-        # 调用AI服务生成代码
-        success, generated_code, test_cases, error_message = await ai_service.generate_code(task, db)
-        
-        if success:
-            print(f"任务 {task_id} AI代码生成成功")
-        else:
-            print(f"任务 {task_id} AI代码生成失败: {error_message}")
-            
-    except Exception as e:
-        print(f"触发AI代码生成异常: {str(e)}")
-        # 记录错误日志
-        try:
-            task = db.query(Task).filter(Task.id == task_id).first()
-            if task:
-                task_log = TaskLog(
-                    task_id=task_id,
-                    status=TaskStatus.SUBMITTED.value,
-                    message=f"AI代码生成触发失败: {str(e)}"
-                )
-                db.add(task_log)
-                db.commit()
-        except:
-            pass  # 避免二次异常
-    finally:
-        # 确保关闭数据库连接
-        db.close()
 
 # ===== 引导部署相关端点 =====
 
@@ -534,7 +508,7 @@ async def create_deployment_session(
     # 重新获取会话数据（包含步骤）
     session_with_steps = db.query(DeploymentSession).filter(DeploymentSession.id == session.id).first()
     
-    return DeploymentSessionResponse.model_validate(session_with_steps)
+    return DeploymentSessionResponse.from_orm(session_with_steps)
 
 @router.get("/{task_id}/deployment/session", response_model=DeploymentSessionResponse, summary="获取部署会话")
 async def get_deployment_session(
@@ -564,58 +538,35 @@ async def get_deployment_session(
 @router.post("/{task_id}/deployment/connect", response_model=DeploymentConnectionResponse, summary="连接服务器")
 async def connect_deployment_server(
     task_id: int,
-    connection_config: dict,
+    auth_config: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """连接到部署服务器"""
-    try:
-        # 获取部署会话
-        session = db.query(DeploymentSession).filter(
-            DeploymentSession.task_id == task_id,
-            DeploymentSession.user_id == current_user.id
-        ).order_by(desc(DeploymentSession.created_at)).first()
-        
-        if not session:
-            raise HTTPException(status_code=404, detail="未找到部署会话")
-        
-        # 从连接配置中提取认证信息
-        auth_config = {
-            "password": connection_config.get("password"),
-            "key_content": connection_config.get("key_content"),
-            "key_path": connection_config.get("key_path")
-        }
-        
-        # 更新会话的服务器配置
-        session.server_host = connection_config.get("host", session.server_host)
-        session.server_port = connection_config.get("port", session.server_port)
-        session.server_username = connection_config.get("username", session.server_username)
-        db.commit()
-        
-        # 尝试连接服务器
-        success, connection_id = await guided_deployment_service.connect_to_server(
-            db, session, auth_config
+    # 获取部署会话
+    session = db.query(DeploymentSession).filter(
+        DeploymentSession.task_id == task_id,
+        DeploymentSession.user_id == current_user.id
+    ).order_by(desc(DeploymentSession.created_at)).first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="未找到部署会话")
+    
+    # 尝试连接服务器
+    success, connection_id = await guided_deployment_service.connect_to_server(
+        db, session, auth_config
+    )
+    
+    if success:
+        return DeploymentConnectionResponse(
+            success=True,
+            connection_id=connection_id,
+            message="服务器连接成功"
         )
-        
-        if success:
-            return DeploymentConnectionResponse(
-                success=True,
-                connection_id=connection_id,
-                message="服务器连接成功"
-            )
-        else:
-            return DeploymentConnectionResponse(
-                success=False,
-                message=connection_id  # 这里connection_id实际是错误消息
-            )
-            
-    except HTTPException:
-        raise  # 重新抛出HTTP异常
-    except Exception as e:
-        logger.error(f"连接服务器时发生异常: {str(e)}")
+    else:
         return DeploymentConnectionResponse(
             success=False,
-            message=f"连接失败: {str(e)}"
+            message=connection_id  # 这里connection_id实际是错误消息
         )
 
 @router.post("/{task_id}/deployment/step/execute", response_model=DeploymentStepExecuteResponse, summary="执行部署步骤")
@@ -719,6 +670,7 @@ async def complete_deployment(
     # 添加日志
     task_log = TaskLog(
         task_id=task_id,
+        action_type="deployment_complete",
         status=TaskStatus.GIT_PUSHED.value,
         message="引导部署完成，代码已推送到Git仓库"
     )

@@ -12,7 +12,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from database import Base, engine
 from models import User, Task, Notification, TaskLog, UserRole, DeploymentSession, DeploymentStep
-from werkzeug.security import generate_password_hash
+from auth_utils import get_password_hash
 
 def init_database():
     """
@@ -81,7 +81,7 @@ def create_default_admin():
         admin_user = User(
             username="admin",
             email="admin@example.com",
-            password_hash=generate_password_hash("admin123"),
+            password_hash=get_password_hash("admin123"),
             role=UserRole.ADMIN,
             is_active=True
         )

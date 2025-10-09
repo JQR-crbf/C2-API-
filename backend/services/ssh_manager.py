@@ -22,7 +22,7 @@ class SSHManager:
         """生成连接ID"""
         return f"{username}@{host}:{port}"
     
-    def _create_connection_sync(
+    async def create_connection(
         self, 
         host: str, 
         port: int, 
@@ -32,7 +32,7 @@ class SSHManager:
         key_content: str = None
     ) -> Tuple[bool, str, Optional[str]]:
         """
-        同步创建SSH连接
+        创建SSH连接
         
         Returns:
             Tuple[success, connection_id, error_message]
@@ -84,15 +84,14 @@ class SSHManager:
                 return False, "", f"连接测试失败: {error}"
             
             # 存储连接信息
-            with self._lock:
-                self.connections[connection_id] = {
-                    'client': ssh_client,
-                    'host': host,
-                    'port': port,
-                    'username': username,
-                    'created_at': datetime.now(),
-                    'last_used': datetime.now()
-                }
+            self.connections[connection_id] = {
+                'client': ssh_client,
+                'host': host,
+                'port': port,
+                'username': username,
+                'created_at': datetime.now(),
+                'last_used': datetime.now()
+            }
             
             logger.info(f"SSH连接创建成功: {connection_id}")
             return True, connection_id, None
@@ -103,28 +102,6 @@ class SSHManager:
             return False, "", f"SSH连接错误: {str(e)}"
         except Exception as e:
             return False, "", f"连接失败: {str(e)}"
-    
-    async def create_connection(
-        self, 
-        host: str, 
-        port: int, 
-        username: str, 
-        password: str = None, 
-        key_path: str = None,
-        key_content: str = None
-    ) -> Tuple[bool, str, Optional[str]]:
-        """
-        异步创建SSH连接
-        
-        Returns:
-            Tuple[success, connection_id, error_message]
-        """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self.executor,
-            self._create_connection_sync,
-            host, port, username, password, key_path, key_content
-        )
     
     async def execute_command(
         self, 

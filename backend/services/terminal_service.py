@@ -132,10 +132,9 @@ class TerminalSession:
     
     def write(self, data: str):
         """向终端写入数据"""
-        if self.process and self.process.poll() is None:
+        if self.pty_process and self.pty_process.isalive():
             try:
-                # 将数据放入队列，由写入线程处理
-                self._input_queue.put(data)
+                self.pty_process.write(data.encode('utf-8'))
                 self.last_activity = time.time()
             except Exception as e:
                 logger.error(f"Error writing to terminal: {e}")
@@ -144,44 +143,47 @@ class TerminalSession:
             raise Exception("Terminal process is not active")
     
     def resize(self, rows: int, cols: int):
-        """调整终端大小（Windows下暂不支持）"""
-        # Windows下的subprocess不支持调整终端大小
-        # 这里可以记录日志或者实现其他逻辑
-        logger.info(f"Terminal resize requested: {rows}x{cols} (not supported on Windows)")
+        """调整终端大小"""
+        if self.pty_process and self.pty_process.isalive():
+            try:
+                self.pty_process.setwinsize(rows, cols)
+            except Exception as e:
+                logger.error(f"Error resizing terminal: {e}")
     
     def terminate(self):
         """终止终端会话"""
         try:
             self._stop_reading = True
             
-            if self.process and self.process.poll() is None:
+            if self.pty_process and self.pty_process.isalive():
                 # 尝试优雅关闭
                 try:
                     if os.name == 'nt':
                         # Windows下终止进程
-                        self.process.terminate()
+                        self.pty_process.terminate()
                     else:
                         # Unix-like系统发送SIGTERM
-                        self.process.terminate()
+                        self.pty_process.kill(signal.SIGTERM)
                     
                     # 等待进程结束
-                    try:
-                        self.process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        # 如果还没结束，强制杀死
-                        self.process.kill()
-                        self.process.wait()
+                    for _ in range(50):  # 最多等待5秒
+                        if not self.pty_process.isalive():
+                            break
+                        time.sleep(0.1)
+                    
+                    # 如果还没结束，强制杀死
+                    if self.pty_process.isalive():
+                        if os.name == 'nt':
+                            self.pty_process.kill()
+                        else:
+                            self.pty_process.kill(signal.SIGKILL)
                             
                 except Exception as e:
-                    logger.error(f"Error terminating process: {e}")
+                    logger.error(f"Error terminating PTY process: {e}")
             
             # 等待读取线程结束
             if self._read_thread and self._read_thread.is_alive():
                 self._read_thread.join(timeout=2)
-            
-            # 等待写入线程结束
-            if self._write_thread and self._write_thread.is_alive():
-                self._write_thread.join(timeout=2)
             
             self.is_active = False
             logger.info(f"Terminal session {self.session_id} terminated")
@@ -191,7 +193,7 @@ class TerminalSession:
     
     def is_alive(self) -> bool:
         """检查终端是否还活着"""
-        return self.process and self.process.poll() is None and self.is_active
+        return self.pty_process and self.pty_process.isalive() and self.is_active
     
     def get_age(self) -> float:
         """获取会话年龄（秒）"""

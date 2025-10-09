@@ -4,11 +4,14 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CheckCircle, Clock, AlertCircle, Play, Loader2, Zap } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { CheckCircle, Clock, AlertCircle, Play, Loader2, ThumbsUp, ThumbsDown } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/contexts/AuthContext"
-import { EnhancedWorkflow } from "./enhanced-workflow"
+import { admin } from "@/lib/api"
+import { useState as useReactState } from "react"
 
 interface WorkflowStep {
   index: number
@@ -73,6 +76,9 @@ function LegacyWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isAdvancing, setIsAdvancing] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [reviewLoading, setReviewLoading] = useReactState<string | null>(null)
+  const [showRejectDialog, setShowRejectDialog] = useReactState(false)
+  const [rejectComment, setRejectComment] = useReactState('')
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -192,16 +198,94 @@ function LegacyWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
 
   const getActionButtonText = (action: string) => {
     const actionMap: { [key: string]: string } = {
-      'pull_code': '拉取代码',
-      'create_branch': '创建分支',
-      'generate_code': '生成代码',
-      'run_tests': '运行测试',
-      'confirm_tests': '确认测试',
-      'push_code': '推送代码',
-      'admin_approve': '管理员审批',
-      'deploy': '部署'
+      'submit_task': '提交任务',
+      'generate_code': '代码生成步骤',
+      'submit_code': '提交代码',
+      'admin_review': '管理员审核',
+      'deploy': '部署完成'
     }
     return actionMap[action] || action
+  }
+
+  // 管理员审核处理函数
+  const handleAdminReview = async (action: 'approve' | 'reject', comment?: string) => {
+    try {
+      setReviewLoading(action)
+      await admin.reviewTask(taskId.toString(), action, comment)
+      
+      toast({
+        title: "成功",
+        description: action === 'approve' ? '任务审核通过' : '任务已拒绝',
+      })
+      
+      // 重新加载工作流程信息
+      await loadWorkflow()
+      
+      // 通知父组件状态已更新
+      if (onStatusUpdate) {
+        onStatusUpdate()
+      }
+      
+      // 关闭拒绝对话框
+      if (action === 'reject') {
+        setShowRejectDialog(false)
+        setRejectComment('')
+      }
+    } catch (error: any) {
+      console.error('审核操作失败:', error)
+      toast({
+        title: "错误",
+        description: error.message || "审核操作失败",
+        variant: "destructive",
+      })
+    } finally {
+      setReviewLoading(null)
+    }
+  }
+
+  const handleRejectClick = () => {
+    setShowRejectDialog(true)
+  }
+
+  const handleRejectConfirm = () => {
+    if (!rejectComment.trim()) {
+      toast({
+        title: "错误",
+        description: "请输入拒绝理由",
+        variant: "destructive",
+      })
+      return
+    }
+    handleAdminReview('reject', rejectComment)
+  }
+
+  // 获取步骤的中文显示名称
+  const getStepDisplayName = (stepName: string, status: string) => {
+    const stepNameMap: { [key: string]: string } = {
+      'submitted': '任务提交',
+      'ai_generating': '代码生成步骤',
+      'test_ready': '代码生成步骤',
+      'code_submitted': '代码提交',
+      'under_review': '管理员审核',
+      'deployed': '部署完成',
+      'approved': '审核通过',
+      'rejected': '审核拒绝'
+    }
+    return stepNameMap[status] || stepNameMap[stepName] || stepName
+  }
+
+  // 获取步骤的描述
+  const getStepDescription = (status: string) => {
+    const descriptionMap: { [key: string]: string } = {
+      'submitted': '用户已提交API开发需求',
+      'ai_generating': 'AI正在分析需求并生成代码',
+      'code_submitted': '代码已生成并提交到代码库',
+      'under_review': '等待管理员审核代码质量',
+      'deployed': '代码已部署到生产环境',
+      'approved': '管理员审核通过',
+      'rejected': '管理员审核未通过，需要修改'
+    }
+    return descriptionMap[status] || '步骤进行中'
   }
 
   if (isLoading) {
@@ -231,6 +315,7 @@ function LegacyWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
   }
 
   return (
+    <>
     <Card className="border-border">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -282,7 +367,7 @@ function LegacyWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
                       isCompleted ? 'text-green-700' :
                       'text-gray-600'
                     }`}>
-                      {step.name}
+                      {getStepDisplayName(step.name, step.status)}
                     </h4>
                     {step.auto && (
                       <Badge variant="secondary" className="text-xs">
@@ -295,7 +380,7 @@ function LegacyWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
                     isCompleted ? 'text-green-600' :
                     'text-gray-500'
                   }`}>
-                    {step.description}
+                    {step.description || getStepDescription(step.status)}
                   </p>
                   
                   {/* 当前步骤的操作按钮 */}
@@ -326,6 +411,45 @@ function LegacyWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
                     </div>
                   )}
                   
+                  {/* 管理员审核按钮 */}
+                  {isCurrent && step.status === 'under_review' && user?.role === 'admin' && (
+                    <div className="mt-3 space-y-2">
+                      <div className="text-xs text-muted-foreground">
+                        管理员审核操作:
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleAdminReview('approve')}
+                          disabled={reviewLoading !== null}
+                          className="text-xs bg-green-600 hover:bg-green-700"
+                        >
+                          {reviewLoading === 'approve' ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <ThumbsUp className="h-3 w-3 mr-1" />
+                          )}
+                          通过
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={handleRejectClick}
+                          disabled={reviewLoading !== null}
+                          className="text-xs"
+                        >
+                          {reviewLoading === 'reject' ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <ThumbsDown className="h-3 w-3 mr-1" />
+                          )}
+                          拒绝
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* 推进到下一步的按钮 */}
                   {isCurrent && step.completed && step.can_advance && (
                     <div className="mt-3">
@@ -351,7 +475,10 @@ function LegacyWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
                         <span className="text-xs text-primary font-medium">
-                          {step.completed ? '已完成，可进入下一步' : '进行中'}
+                          {step.completed ? 
+                            (step.can_advance ? '已完成，可进入下一步' : '已完成') : 
+                            '进行中'
+                          }
                         </span>
                       </div>
                     </div>
@@ -363,28 +490,53 @@ function LegacyWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
         </div>
       </CardContent>
     </Card>
+    
+    {/* 拒绝对话框 */}
+    <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>拒绝任务</DialogTitle>
+          <DialogDescription>
+            请输入拒绝理由，任务将回到代码生成步骤。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="reject-comment">拒绝理由</Label>
+            <Textarea
+              id="reject-comment"
+              placeholder="请输入拒绝理由..."
+              value={rejectComment}
+              onChange={(e) => setRejectComment(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setShowRejectDialog(false)}
+            disabled={reviewLoading === 'reject'}
+          >
+            取消
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleRejectConfirm}
+            disabled={reviewLoading === 'reject' || !rejectComment.trim()}
+          >
+            {reviewLoading === 'reject' ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : null}
+            确认拒绝
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
 
 export function TaskWorkflow({ taskId, onStatusUpdate }: TaskWorkflowProps) {
-  return (
-    <Tabs defaultValue="enhanced" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="enhanced" className="flex items-center gap-2">
-          <Zap className="h-4 w-4" />
-          增强版工作流
-        </TabsTrigger>
-        <TabsTrigger value="legacy" className="flex items-center gap-2">
-          <Play className="h-4 w-4" />
-          传统工作流
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent value="enhanced">
-        <EnhancedWorkflow taskId={taskId} onStatusUpdate={onStatusUpdate} />
-      </TabsContent>
-      <TabsContent value="legacy">
-        <LegacyWorkflow taskId={taskId} onStatusUpdate={onStatusUpdate} />
-      </TabsContent>
-    </Tabs>
-  )
+  return <LegacyWorkflow taskId={taskId} onStatusUpdate={onStatusUpdate} />
 }

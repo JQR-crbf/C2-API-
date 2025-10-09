@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-from werkzeug.security import check_password_hash, generate_password_hash
+from passlib.context import CryptContext
 from fastapi import HTTPException, status
 
 # JWT配置
@@ -9,13 +9,16 @@ SECRET_KEY = "your-secret-key-here-change-in-production"  # 生产环境需要�
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30天
 
+# 使用更快的密码哈希算法，降低复杂度以提高性能
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=4)
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """验证密码"""
-    return check_password_hash(hashed_password, plain_password)
+    """验证密码 - 使用更快的bcrypt算法"""
+    return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    """生成密码哈希"""
-    return generate_password_hash(password)
+    """生成密码哈希 - 使用更快的bcrypt算法"""
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """创建访问令牌"""

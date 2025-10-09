@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import uvicorn
 import asyncio
 import json
+import traceback
 from typing import Dict, List
 
 from database import get_db, engine, Base
@@ -73,7 +75,24 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 # 路由注册
-from routers import auth, tasks, admin, notifications, testing, workflow, ai_router, git_router, test_router, ssh_router, deployment_router, terminal_router
+from routers import auth, tasks, admin, notifications, testing, workflow, ai_router, git_router, test_router, ssh_router, deployment_router
+
+# 添加全局异常处理器
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"全局异常处理器捕获到错误: {exc}")
+    print(f"错误类型: {type(exc)}")
+    print(f"错误详情: {traceback.format_exc()}")
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": f"服务器内部错误: {str(exc)}",
+            "error_type": str(type(exc).__name__),
+            "path": str(request.url)
+        }
+    )
+
 app.include_router(auth.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
@@ -83,7 +102,7 @@ app.include_router(workflow.router, prefix="/api")
 app.include_router(ai_router.router, prefix="/api")
 app.include_router(ssh_router.router, prefix="/api")
 app.include_router(deployment_router.router, prefix="/api")
-app.include_router(terminal_router.router, prefix="/api")
+app.include_router(deployment_router.guided_router, prefix="/api")
 app.include_router(git_router.router)
 app.include_router(test_router.router)
 

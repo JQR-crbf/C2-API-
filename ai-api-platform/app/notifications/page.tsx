@@ -77,11 +77,11 @@ export default function NotificationsPage() {
     }
   }
 
-  const handleMarkAsRead = async (notificationId: string) => {
+  const handleMarkAsRead = async (notificationId: number) => {
     try {
-      await notifications.markAsRead(notificationId)
+      await notifications.markAsRead(notificationId.toString())
       setAllNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       )
       toast({
         title: "成功",
@@ -101,7 +101,7 @@ export default function NotificationsPage() {
     try {
       await notifications.markAllAsRead()
       setAllNotifications(prev => 
-        prev.map(n => ({ ...n, read: true }))
+        prev.map(n => ({ ...n, is_read: true }))
       )
       toast({
         title: "成功",
@@ -117,9 +117,9 @@ export default function NotificationsPage() {
     }
   }
 
-  const handleDeleteNotification = async (notificationId: string) => {
+  const handleDeleteNotification = async (notificationId: number) => {
     try {
-      await notifications.delete(notificationId)
+      await notifications.delete(notificationId.toString())
       setAllNotifications(prev => 
         prev.filter(n => n.id !== notificationId)
       )
@@ -139,12 +139,12 @@ export default function NotificationsPage() {
 
   const filteredNotifications = allNotifications.filter(notification => {
     if (activeTab === "unread") {
-      return !notification.read
+      return !notification.is_read
     }
     return true
   })
 
-  const unreadCount = allNotifications.filter(n => !n.read).length
+  const unreadCount = allNotifications.filter(n => !n.is_read).length
 
   if (loading) {
     return (
@@ -226,8 +226,8 @@ export default function NotificationsPage() {
 
 interface NotificationListProps {
   notifications: Notification[]
-  onMarkAsRead: (id: string) => void
-  onDelete: (id: string) => void
+  onMarkAsRead: (id: number) => void
+  onDelete: (id: number) => void
 }
 
 function NotificationList({ notifications, onMarkAsRead, onDelete }: NotificationListProps) {
@@ -248,25 +248,25 @@ function NotificationList({ notifications, onMarkAsRead, onDelete }: Notificatio
   return (
     <div className="space-y-4">
       {notifications.map((notification) => (
-        <Card key={notification.id} className={`${!notification.read ? 'border-l-4 border-l-primary' : ''}`}>
+        <Card key={notification.id} className={`${!notification.is_read ? 'border-l-4 border-l-primary' : ''}`}>
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-3 flex-1">
                 {getNotificationIcon(notification.type)}
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className={`font-semibold ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <h3 className={`font-semibold ${!notification.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {notification.title || '通知'}
                     </h3>
                     {getNotificationBadge(notification.type)}
-                    {!notification.read && (
+                    {!notification.is_read && (
                       <Badge variant="secondary" className="text-xs">
                         未读
                       </Badge>
                     )}
                   </div>
-                  <p className={`${!notification.read ? 'text-foreground' : 'text-muted-foreground'} mb-2`}>
-                    {notification.message}
+                  <p className={`${!notification.is_read ? 'text-foreground' : 'text-muted-foreground'} mb-2`}>
+                    {notification.content}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(notification.created_at).toLocaleString('zh-CN')}
@@ -275,7 +275,7 @@ function NotificationList({ notifications, onMarkAsRead, onDelete }: Notificatio
               </div>
               
               <div className="flex items-center gap-2 ml-4">
-                {!notification.read && (
+                {!notification.is_read && (
                   <Button
                     variant="ghost"
                     size="sm"

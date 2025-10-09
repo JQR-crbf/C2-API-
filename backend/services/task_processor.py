@@ -59,12 +59,11 @@ class TaskProcessor:
     
     def _get_pending_tasks(self, db: Session) -> List[Task]:
         """获取待处理的任务列表"""
+        # 注释掉自动处理SUBMITTED状态的任务，改为手动聊天生成代码
         return db.query(Task).filter(
             Task.status.in_([
-                TaskStatus.SUBMITTED,
-                TaskStatus.CODE_PULLING,
-                TaskStatus.BRANCH_CREATED,
-                TaskStatus.TEST_READY
+                # TaskStatus.SUBMITTED,  # 不再自动处理已提交的任务
+                TaskStatus.AI_GENERATING
             ])
         ).order_by(Task.created_at).limit(5).all()  # 限制并发处理数量
     
@@ -85,14 +84,11 @@ class TaskProcessor:
             logger.info(f"开始处理任务 {task_id}: {task.title}")
             
             # 根据任务状态执行相应的处理步骤
-            if task.status == TaskStatus.SUBMITTED:
-                await self._handle_submitted_task(task, db)
-            elif task.status == TaskStatus.CODE_PULLING:
-                await self._handle_code_pulling_task(task, db)
-            elif task.status == TaskStatus.BRANCH_CREATED:
-                await self._handle_branch_created_task(task, db)
-            elif task.status == TaskStatus.TEST_READY:
-                await self._handle_test_ready_task(task, db)
+            # 注释掉自动处理SUBMITTED状态，改为手动聊天生成代码
+            # if task.status == TaskStatus.SUBMITTED:
+            #     await self._handle_submitted_task(task, db)
+            if task.status == TaskStatus.AI_GENERATING:
+                await self._handle_ai_generating_task(task, db)
             
         except Exception as e:
             logger.error(f"处理任务 {task_id} 时发生异常：{str(e)}")
@@ -111,12 +107,12 @@ class TaskProcessor:
     
     async def _handle_submitted_task(self, task: Task, db: Session):
         """处理已提交的任务"""
-        # 模拟代码拉取过程
-        task.status = TaskStatus.CODE_PULLING
-        self._add_task_log(task.id, TaskStatus.CODE_PULLING, "开始拉取代码仓库", db)
+        # 直接进入AI代码生成阶段
+        task.status = TaskStatus.AI_GENERATING
+        self._add_task_log(task.id, TaskStatus.AI_GENERATING, "开始AI代码生成", db)
         db.commit()
         
-        # 模拟拉取延时
+        # 模拟AI生成延时
         await asyncio.sleep(2)
         
         # 模拟创建分支
@@ -141,24 +137,23 @@ class TaskProcessor:
         )
         db.commit()
     
-    async def _handle_code_pulling_task(self, task: Task, db: Session):
-        """处理代码拉取中的任务"""
-        # 这个状态通常很快转换，这里直接跳到下一步
-        await self._handle_submitted_task(task, db)
-    
-    async def _handle_branch_created_task(self, task: Task, db: Session):
-        """处理分支已创建的任务"""
+    async def _handle_ai_generating_task(self, task: Task, db: Session):
+        """处理AI代码生成任务"""
         # 调用AI服务生成代码
         success, generated_code, test_cases, error = await ai_service.generate_code(task, db)
         
         if success:
             logger.info(f"任务 {task.id} AI代码生成成功")
+            # 更新任务状态为代码已提交
+            task.status = TaskStatus.CODE_SUBMITTED
+            self._add_task_log(task.id, TaskStatus.CODE_SUBMITTED, "AI代码生成完成，代码已提交", db)
+            
             # 发送成功通知
             self._create_notification(
                 task.user_id,
                 task.id,
                 "代码生成完成",
-                f"您的任务 '{task.title}' 的代码已生成完成，正在准备测试环境。",
+                f"您的任务 '{task.title}' 的代码已生成完成，等待管理员审核。",
                 NotificationType.SUCCESS,
                 db
             )
@@ -176,50 +171,14 @@ class TaskProcessor:
         
         db.commit()
     
-    async def _handle_test_ready_task(self, task: Task, db: Session):
-        """处理测试准备就绪的任务"""
-        # 部署到测试环境
-        success, test_url, error = await test_service.deploy_to_test_environment(task, db)
-        
-        if success:
-            logger.info(f"任务 {task.id} 测试环境部署成功：{test_url}")
-            
-            # 更新任务状态为代码已推送（准备管理员审核）
-            task.status = TaskStatus.CODE_PUSHED
-            self._add_task_log(
-                task.id, 
-                TaskStatus.CODE_PUSHED, 
-                "代码已推送，等待管理员审核", 
-                db
-            )
-            
-            # 发送成功通知
-            self._create_notification(
-                task.user_id,
-                task.id,
-                "测试环境部署成功",
-                f"您的任务 '{task.title}' 已部署到测试环境，访问地址：{test_url}。现在等待管理员审核。",
-                NotificationType.SUCCESS,
-                db
-            )
-        else:
-            logger.error(f"任务 {task.id} 测试环境部署失败：{error}")
-            # 发送失败通知
-            self._create_notification(
-                task.user_id,
-                task.id,
-                "测试环境部署失败",
-                f"您的任务 '{task.title}' 的测试环境部署失败：{error}",
-                NotificationType.ERROR,
-                db
-            )
-        
-        db.commit()
+    # 旧的处理方法已被简化的工作流程替代
+    # 新的工作流程只需要处理 SUBMITTED -> AI_GENERATING -> CODE_SUBMITTED -> APPROVED -> COMPLETED
     
     def _add_task_log(self, task_id: int, status: TaskStatus, message: str, db: Session):
         """添加任务日志"""
         task_log = TaskLog(
             task_id=task_id,
+            action_type="task_processing",
             status=status.value,
             message=message
         )

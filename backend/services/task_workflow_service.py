@@ -9,84 +9,48 @@ logger = logging.getLogger(__name__)
 class TaskWorkflowService:
     """任务工作流程控制服务"""
     
-    # 定义任务步骤的顺序和依赖关系
+    # 定义任务步骤的顺序和依赖关系 - 简化为5个核心步骤
     WORKFLOW_STEPS = [
         {
             'status': TaskStatus.SUBMITTED,
             'name': '任务提交',
             'description': '任务已提交到系统',
             'auto': True,  # 自动完成
-            'required_actions': []
-        },
-        {
-            'status': TaskStatus.CODE_PULLING,
-            'name': '代码拉取',
-            'description': '从代码仓库拉取基础代码',
-            'auto': False,  # 需要手动触发
-            'required_actions': ['pull_code']
-        },
-        {
-            'status': TaskStatus.BRANCH_CREATED,
-            'name': '分支创建',
-            'description': '为此任务创建专用开发分支',
-            'auto': False,
-            'required_actions': ['create_branch']
-        },
-        {
-            'status': TaskStatus.AI_GENERATING,
-            'name': 'AI代码生成',
-            'description': 'AI正在根据需求生成代码',
-            'auto': False,
-            'required_actions': ['generate_code']
+            'required_actions': [],
+            'editable_by': ['user', 'admin']  # 用户和管理员都可以编辑
         },
         {
             'status': TaskStatus.TEST_READY,
-            'name': '测试准备',
-            'description': '代码生成完成，准备进行测试',
-            'auto': True,  # AI生成完成后自动进入
-            'required_actions': []
+            'name': '代码生成',
+            'description': '代码生成步骤已完成，准备进入测试',
+            'auto': False,  # 需要手动触发
+            'required_actions': ['generate_code'],
+            'editable_by': ['user', 'admin']  # 用户和管理员都可以编辑
         },
         {
-            'status': TaskStatus.TESTING,
-            'name': '代码测试',
-            'description': '正在执行自动化测试',
+            'status': TaskStatus.CODE_SUBMITTED,
+            'name': '代码提交',
+            'description': '代码已提交，等待审核',
             'auto': False,
-            'required_actions': ['run_tests']
-        },
-        {
-            'status': TaskStatus.TEST_COMPLETED,
-            'name': '测试完成',
-            'description': '所有测试已通过',
-            'auto': False,
-            'required_actions': ['confirm_tests']
-        },
-        {
-            'status': TaskStatus.CODE_PUSHED,
-            'name': '代码推送',
-            'description': '代码已推送到仓库',
-            'auto': False,
-            'required_actions': ['push_code']
+            'required_actions': ['submit_code'],
+            'editable_by': ['user', 'admin']  # 用户和管理员都可以编辑
         },
         {
             'status': TaskStatus.UNDER_REVIEW,
-            'name': '代码审查',
-            'description': '代码正在接受人工审查',
-            'auto': True,  # 推送后自动进入审查
-            'required_actions': []
-        },
-        {
-            'status': TaskStatus.APPROVED,
-            'name': '审查通过',
-            'description': '代码审查已通过',
-            'auto': False,  # 管理员操作
-            'required_actions': ['admin_approve']
+            'name': '管理员审核',
+            'description': '管理员正在审核代码，可以选择通过或拒绝',
+            'auto': False,  # 管理员手动操作
+            'required_actions': ['admin_review'],
+            'editable_by': ['admin'],  # 只有管理员可以编辑
+            'allow_remarks': True  # 允许添加备注
         },
         {
             'status': TaskStatus.DEPLOYED,
             'name': '部署完成',
             'description': 'API已成功部署到生产环境',
             'auto': False,
-            'required_actions': ['deploy']
+            'required_actions': ['deploy'],
+            'editable_by': ['admin']  # 只有管理员可以编辑
         }
     ]
     
@@ -176,52 +140,25 @@ class TaskWorkflowService:
         status = step['status']
         
         try:
-            if status == TaskStatus.CODE_PULLING:
-                # 检查是否已拉取代码和相关文件是否存在
-                return (self.check_action_completed(task, 'pull_code') and 
-                       self._validate_code_pull_completion(task))
+            if status == TaskStatus.SUBMITTED:
+                # 任务提交步骤，自动完成
+                return True
             
-            elif status == TaskStatus.BRANCH_CREATED:
-                # 检查是否已创建分支并验证分支名称格式
-                return (task.branch_name is not None and 
-                       task.branch_name.strip() != '' and
-                       self._validate_branch_name(task.branch_name) and
-                       self.check_action_completed(task, 'create_branch'))
+            elif status == TaskStatus.TEST_READY:
+                # 检查是否已完成代码生成步骤
+                return self.check_action_completed(task, 'generate_code')
             
-            elif status == TaskStatus.AI_GENERATING:
-                # 检查是否已生成代码并验证代码质量
-                return (task.generated_code is not None and 
-                       task.generated_code.strip() != '' and
-                       self._validate_generated_code(task) and
-                       self.check_action_completed(task, 'generate_code'))
-            
-            elif status == TaskStatus.TESTING:
-                # 检查是否已运行测试并验证测试结果
-                return (self.check_action_completed(task, 'run_tests') and
-                       self._validate_test_results(task))
-            
-            elif status == TaskStatus.TEST_COMPLETED:
-                # 检查是否已确认测试结果并验证测试覆盖率
-                return (self.check_action_completed(task, 'confirm_tests') and
-                       self._validate_test_coverage(task))
-            
-            elif status == TaskStatus.CODE_PUSHED:
-                # 检查是否已推送代码并验证远程仓库状态
-                return (self.check_action_completed(task, 'push_code') and
-                       self._validate_code_push_completion(task))
+            elif status == TaskStatus.CODE_SUBMITTED:
+                # 检查是否已提交代码
+                return self.check_action_completed(task, 'submit_code')
             
             elif status == TaskStatus.UNDER_REVIEW:
-                # 检查是否已进入审查状态
-                return self.check_action_completed(task, 'start_review')
-            
-            elif status == TaskStatus.APPROVED:
-                # 检查是否已通过审查
-                return self.check_action_completed(task, 'admin_approve')
+                # 检查是否已完成管理员审核
+                return self.check_action_completed(task, 'admin_review')
             
             elif status == TaskStatus.DEPLOYED:
                 # 检查是否已部署
-                return (self.check_action_completed(task, 'deploy') and
-                       self._validate_deployment_status(task))
+                return self.check_action_completed(task, 'deploy')
         
         except Exception as e:
             logger.error(f"检查步骤完成状态时发生错误: {str(e)}")
@@ -258,16 +195,12 @@ class TaskWorkflowService:
     
     def has_permission_for_step(self, user: User, step: Dict) -> bool:
         """检查用户是否有权限执行某个步骤"""
-        # 管理员可以执行所有步骤
-        if user.role.value == 'admin':
-            return True
+        # 获取步骤的权限配置
+        editable_by = step.get('editable_by', ['user', 'admin'])
         
-        # 普通用户不能执行管理员专属步骤
-        admin_only_steps = [TaskStatus.APPROVED, TaskStatus.DEPLOYED]
-        if step['status'] in admin_only_steps:
-            return False
-        
-        return True
+        # 检查用户角色是否在允许的角色列表中
+        user_role = user.role.value
+        return user_role in editable_by
     
     def advance_to_next_step(self, task: Task, user: User, action_data: Dict = None) -> Dict[str, any]:
         """推进到下一步骤"""
@@ -294,6 +227,7 @@ class TaskWorkflowService:
         
         task_log = TaskLog(
             task_id=task.id,
+            action_type="advance_step",
             status=next_step['status'].value,
             message=log_message
         )
@@ -317,17 +251,31 @@ class TaskWorkflowService:
                 'message': f"状态更新失败: {str(e)}"
             }
     
-    def mark_action_completed(self, task: Task, action: str, message: str = None) -> bool:
+    def mark_action_completed(self, task: Task, action: str, message: str = None, user: User = None) -> bool:
         """标记某个操作为已完成"""
         try:
-            log_message = f"action:{action}:completed"
+            # 根据操作类型生成更友好的消息
+            action_messages = {
+                'generate_code': '点击了生成代码',
+                'submit_code': '点击了代码提交', 
+                'admin_review': '进行了管理员审核',
+                'deploy': '点击了部署完成'
+            }
+            
             if message:
-                log_message += f" - {message}"
+                log_message = message
+            else:
+                log_message = action_messages.get(action, f"完成了 {action} 操作")
+            
+            # 添加操作完成标记到消息中，用于后续检查
+            log_message_with_marker = f"{log_message} - action:{action}:completed"
             
             task_log = TaskLog(
                 task_id=task.id,
+                user_id=user.id if user else None,
+                action_type=action,
                 status=task.status.value,
-                message=log_message
+                message=log_message_with_marker
             )
             self.db.add(task_log)
             self.db.commit()
@@ -365,7 +313,11 @@ class TaskWorkflowService:
             elif i == current_index:
                 step_info['completed'] = self.is_step_completed(task, step)
                 step_info['current'] = True
-                step_info['can_advance'] = step_info['completed']
+                # 如果是最后一步（部署完成），不显示"进入下一步"按钮
+                if step['status'] == TaskStatus.DEPLOYED:
+                    step_info['can_advance'] = False
+                else:
+                    step_info['can_advance'] = step_info['completed']
                 completed_steps.append(step_info)
             else:
                 step_info['completed'] = False
@@ -374,7 +326,8 @@ class TaskWorkflowService:
         
         return {
             'current_step_index': current_index,
-            'current_step': current_step,
+            'current_step': current_index,  # 返回步骤索引数字，而不是步骤对象
+            'current_step_info': current_step,  # 步骤详细信息单独返回
             'total_steps': len(self.WORKFLOW_STEPS),
             'progress_percentage': int((current_index / (len(self.WORKFLOW_STEPS) - 1)) * 100),
             'completed_steps': completed_steps,
@@ -502,12 +455,12 @@ class TaskWorkflowService:
                     'met': self.check_action_completed(task, 'pull_code')
                 })
             
-            elif status == TaskStatus.AI_GENERATING:
+            elif status == TaskStatus.TEST_READY:
                 prerequisites.extend([
                     {
-                        'condition': 'branch_created',
-                        'description': '需要先创建开发分支',
-                        'met': task.branch_name is not None
+                        'condition': 'task_submitted',
+                        'description': '任务需要先提交',
+                        'met': True  # 如果到了这个状态，说明任务已提交
                     },
                     {
                         'condition': 'requirements_clear',
@@ -578,6 +531,7 @@ class TaskWorkflowService:
             
             task_log = TaskLog(
                 task_id=task.id,
+                action_type="rollback_step",
                 status=previous_step['status'].value,
                 message=log_message
             )
@@ -627,6 +581,7 @@ class TaskWorkflowService:
                 log_message = f"管理员批量更新：任务状态从 {old_status.value} 更新为 {target_status.value}"
                 task_log = TaskLog(
                     task_id=task.id,
+                    action_type="batch_update",
                     status=target_status.value,
                     message=log_message
                 )
