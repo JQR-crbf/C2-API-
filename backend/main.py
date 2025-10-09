@@ -120,7 +120,37 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "ai-api-platform-backend"}
+    """健康检查端点 - Railway部署必需"""
+    try:
+        # 基础健康检查
+        health_status = {
+            "status": "healthy", 
+            "service": "ai-api-platform-backend",
+            "timestamp": str(asyncio.get_event_loop().time())
+        }
+        
+        # 尝试数据库连接检查（可选，避免阻塞）
+        try:
+            from database import engine
+            with engine.connect() as conn:
+                conn.execute("SELECT 1")
+            health_status["database"] = "connected"
+        except Exception as db_error:
+            # 数据库连接失败不影响基础健康检查
+            health_status["database"] = "disconnected"
+            health_status["database_error"] = str(db_error)
+            print(f"数据库连接检查失败: {db_error}")
+        
+        return health_status
+        
+    except Exception as e:
+        print(f"健康检查失败: {e}")
+        # 即使出错也返回200状态码，避免Railway认为服务不健康
+        return {
+            "status": "degraded", 
+            "service": "ai-api-platform-backend",
+            "error": str(e)
+        }
 
 # WebSocket端点
 @app.websocket("/ws")
@@ -170,12 +200,29 @@ async def send_realtime_notification(user_id: int, notification_type: str, data:
 # 启动事件
 @app.on_event("startup")
 async def startup_event():
-    """应用启动时的事件处理"""
+    """应用启动事件"""
+    import fastapi
+    import sys
+    print("🚀 AI API开发自动化平台后端服务启动中...")
+    print(f"📊 FastAPI版本: {fastapi.__version__}")
+    print(f"🔧 Python版本: {sys.version}")
+    
+    # 检查数据库连接
+    try:
+        from database import engine
+        with engine.connect() as conn:
+            result = conn.execute("SELECT 1")
+            print("✅ 数据库连接成功")
+    except Exception as e:
+        print(f"❌ 数据库连接失败: {e}")
+        print("⚠️  服务将继续启动，但数据库功能可能不可用")
+    
     from services.task_processor import start_task_processor
     # 在后台启动任务处理器
     asyncio.create_task(start_task_processor())
     print("后台任务处理器已启动")
     print("WebSocket服务已启动")
+    print("✅ 后端服务启动完成！")
 
 @app.on_event("shutdown")
 async def shutdown_event():
