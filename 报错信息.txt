@@ -1,0 +1,154 @@
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+文件 ”<frozen importlib._bootstrap> "，第 1176 行，在 _find_and_load 中
+    with self.connect() as conn:
+使用 self.connect() 作为连接：
+  File "/app/main.py", line 17, in <module>
+文件“/app/main.py”，第 17 行，在<module>
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+文件 ”<frozen importlib._bootstrap> "，第 1147 行，在 _find_and_load_unlocked
+         ^^^^^^^^^^^^^^
+    Base.metadata.create_all(bind=engine)
+Base.metadata.create_all（绑定=引擎）
+The above exception was the direct cause of the following exception:
+上述异常是以下异常的直接原因：
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+文件 ”<frozen importlib._bootstrap> "，第 690 行，在 _load_unlocked 中
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 3277, in connect
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py”，第 3277 行，连接中
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/schema.py", line 5924, in create_all
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/sql/schema.py”，第 5924 行，位于 create_all
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+文件 ”<frozen importlib._bootstrap_external> "，第 940 行，在 exec_module 中
+    return self._connection_cls(self)
+返回 self._connection_cls(self)
+    bind._run_ddl_visitor(  绑定._run_ddl_visitor（
+Traceback (most recent call last):
+回溯（最近一次调用最后一次）：
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 3251, in _run_ddl_visitor
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py”，第 3251 行，位于 _run_ddl_visitor
+  File "/usr/local/bin/uvicorn", line 8, in <module>
+文件“/usr/local/bin/uvicorn”，第 8 行，位于<module>
+    with self.begin() as conn:
+使用 self.begin() 作为 conn：
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 145, in __init__
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py”，第 145 行，位于 __init__
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 423, in main
+文件“/usr/local/lib/python3.11/site-packages/uvicorn/main.py”，第 423 行，在主文件中
+    sys.exit(main())  系统退出（main()）
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/contextlib.py", line 137, in __enter__
+文件“/usr/local/lib/python3.11/contextlib.py”，第 137 行，位于 __enter__
+    run(  跑步（
+             ^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+文件“/usr/local/lib/python3.11/site-packages/uvicorn/importer.py”，第 19 行，位于 import_from_string
+  File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1462, in __call__
+文件“/usr/local/lib/python3.11/site-packages/click/core.py”，第 1462 行，位于 __call__
+    return next(self.gen)  返回下一个（self.gen）
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 593, in run
+文件“/usr/local/lib/python3.11/site-packages/uvicorn/main.py”，第 593 行，正在运行
+    return self.main(*args, **kwargs)
+返回 self.main(*args，**kwargs)
+    module = importlib.import_module(module_str)
+模块 = importlib.import_module(module_str)
+           ^^^^^^^^^^^^^^
+    server.run()  服务器.运行()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 3241, in begin
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py”，第 3241 行，开始
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 67, in run
+文件“/usr/local/lib/python3.11/site-packages/uvicorn/server.py”，第 67 行，正在运行
+    return runner.run(main)  返回 runner.run(main)
+  File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+文件“/usr/local/lib/python3.11/importlib/__init__.py”，第 126 行，位于 import_module
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+返回 asyncio_run（self.serve（sockets=sockets），loop_factory=self.config.get_loop_factory（））
+    return _bootstrap._gcd_import(name[level:], package, level)
+返回 _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/_compat.py", line 23, in asyncio_run
+文件“/usr/local/lib/python3.11/site-packages/uvicorn/_compat.py”，第 23 行，位于 asyncio_run
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+文件“/usr/local/lib/python3.11/asyncio/runners.py”，第 118 行，正在运行
+    return self._loop.run_until_complete(task)
+返回 self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+文件“uvloop/loop.pyx”，第 1518 行，位于 uvloop.loop.Loop.run_until_complete
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 71, in serve
+文件“/usr/local/lib/python3.11/site-packages/uvicorn/server.py”，第 71 行，在服务中
+    await self._serve(sockets)
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 78, in _serve
+    config.load()
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 438, in load
+    self.loaded_app = import_from_string(self.app)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 3301, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 1264, in _checkout
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py”，第 1264 行，在 _checkout 中
+    fairy = _ConnectionRecord.checkout(pool)
+仙女 = _ConnectionRecord.checkout（池）
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 711, in checkout
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py”，第 711 行，正在结帐
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/impl.py", line 177, in _do_get
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/impl.py”，第 177 行，在 _do_get 中
+    with util.safe_reraise():
+使用 util.safe_reraise()：
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py”，第 224 行，位于 __exit__
+    raise exc_value.with_traceback(exc_tb)
+提高 exc_value.with_traceback(exc_tb)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/impl.py", line 175, in _do_get
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/impl.py”，第 175 行，在 _do_get 中
+    return self._create_connection()
+返回 self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 673, in __init__
+    self.__connect()
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 899, in __connect
+    with util.safe_reraise():
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/pool/base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/create.py", line 661, in connect
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/create.py”，第 661 行，连接中
+    return dialect.connect(*cargs, **cparams)
+返回方言.connect（*cargs，**cparams）
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 629, in connect
+文件“/usr/local/lib/python3.11/site-packages/sqlalchemy/engine/default.py”，第 629 行，连接中
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+return self.loaded_dbapi.connect(*cargs, **cparams) # 类型：忽略[无任何返回] # NOQA：E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/MySQLdb/__init__.py", line 121, in Connect
+文件“/usr/local/lib/python3.11/site-packages/MySQLdb/__init__.py”，第 121 行，位于 Connect
+    return Connection(*args, **kwargs)
+返回连接（*args，**kwargs）
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/MySQLdb/connections.py", line 200, in __init__
+文件“/usr/local/lib/python3.11/site-packages/MySQLdb/connections.py”，第 200 行，位于 __init__
+    super().__init__(*args, **kwargs2)
+超级（）。__init__（*args，**kwargs2）
+sqlalchemy.exc.OperationalError: (MySQLdb.OperationalError) (1045, "Access denied for user 'root'@'fd12:dd45:4006:0:2000:3a:fbf7:e477' (using password: YES)")
+sqlalchemy.exc.OperationalError: (MySQLdb.OperationalError) (1045, “拒绝用户‘root’@‘fd12:dd45:4006:0:2000:3a:fbf7:e477’的访问（使用密码：是）”）
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+（此错误的背景信息：https://sqlalche.me/e/20/e3q8）

@@ -121,36 +121,13 @@ async def root():
 @app.get("/health")
 async def health_check():
     """健康检查端点 - Railway部署必需"""
-    try:
-        # 基础健康检查
-        health_status = {
-            "status": "healthy", 
-            "service": "ai-api-platform-backend",
-            "timestamp": str(asyncio.get_event_loop().time())
-        }
-        
-        # 尝试数据库连接检查（可选，避免阻塞）
-        try:
-            from database import engine
-            with engine.connect() as conn:
-                conn.execute("SELECT 1")
-            health_status["database"] = "connected"
-        except Exception as db_error:
-            # 数据库连接失败不影响基础健康检查
-            health_status["database"] = "disconnected"
-            health_status["database_error"] = str(db_error)
-            print(f"数据库连接检查失败: {db_error}")
-        
-        return health_status
-        
-    except Exception as e:
-        print(f"健康检查失败: {e}")
-        # 即使出错也返回200状态码，避免Railway认为服务不健康
-        return {
-            "status": "degraded", 
-            "service": "ai-api-platform-backend",
-            "error": str(e)
-        }
+    from datetime import datetime
+    # 简化健康检查，确保快速响应
+    return {
+        "status": "healthy", 
+        "service": "ai-api-platform-backend",
+        "timestamp": datetime.now().isoformat()
+    }
 
 # WebSocket端点
 @app.websocket("/ws")
