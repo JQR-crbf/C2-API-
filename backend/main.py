@@ -67,7 +67,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 从环境变量读取允许的源，默认包含本地开发地址
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
+
+# 打印CORS配置用于调试
+print("=" * 50)
+print("CORS Configuration:")
+print(f"ALLOWED_ORIGINS environment variable: {allowed_origins_str}")
+print(f"Parsed allowed origins: {allowed_origins}")
+print("=" * 50)
 
 app.add_middleware(
     CORSMiddleware,
