@@ -1,6 +1,8 @@
 // API客户端工具 - 处理所有HTTP请求和认证
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+// 临时硬编码 Railway 地址进行测试
+const API_BASE_URL = 'https://c2-api-production.up.railway.app'
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
 // 认证相关类型
 export interface LoginRequest {

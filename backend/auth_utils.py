@@ -10,29 +10,34 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30天
 
 # 使用bcrypt密码哈希算法
-# 明确指定使用bcrypt库，避免passlib的自动检测导致的72字节错误
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__ident="2b"  # 使用现代bcrypt格式，避免detect_wrap_bug检测
-)
+# 直接导入bcrypt库，绕过passlib的版本检测问题
+import bcrypt
+
+# 使用原生bcrypt而不是passlib包装，避免detect_wrap_bug检测问题
+def _bcrypt_hash(password: str) -> str:
+    """使用原生bcrypt加密密码"""
+    password_bytes = password.encode('utf-8')
+    # bcrypt限制72字节
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
+
+def _bcrypt_verify(password: str, hashed: str) -> bool:
+    """使用原生bcrypt验证密码"""
+    password_bytes = password.encode('utf-8')
+    # bcrypt限制72字节
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72]
+    return bcrypt.checkpw(password_bytes, hashed.encode('utf-8'))
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """验证密码 - 使用更快的bcrypt算法"""
-    # bcrypt限制密码不能超过72字节，与加密时保持一致
-    password_bytes = plain_password.encode('utf-8')
-    if len(password_bytes) > 72:
-        plain_password = password_bytes[:72].decode('utf-8', errors='ignore')
-    return pwd_context.verify(plain_password, hashed_password)
+    """验证密码 - 使用原生bcrypt"""
+    return _bcrypt_verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    """生成密码哈希 - 使用更快的bcrypt算法"""
-    # bcrypt限制密码不能超过72字节，确保安全截断
-    password_bytes = password.encode('utf-8')
-    if len(password_bytes) > 72:
-        # 截断到72字节，确保不会截断在UTF-8字符中间
-        password = password_bytes[:72].decode('utf-8', errors='ignore')
-    return pwd_context.hash(password)
+    """生成密码哈希 - 使用原生bcrypt"""
+    return _bcrypt_hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """创建访问令牌"""
