@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from database import get_db, SessionLocal
 from models import Task, TaskStatus, TaskLog, Notification, NotificationType
 from services.ai_service import ai_service
-from services.test_service import test_service
 from typing import List
 
 # 配置日志
