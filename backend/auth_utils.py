@@ -14,10 +14,19 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码 - 使用更快的bcrypt算法"""
+    # bcrypt限制密码不能超过72字节，与加密时保持一致
+    password_bytes = plain_password.encode('utf-8')
+    if len(password_bytes) > 72:
+        plain_password = password_bytes[:72].decode('utf-8', errors='ignore')
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
     """生成密码哈希 - 使用更快的bcrypt算法"""
+    # bcrypt限制密码不能超过72字节，确保安全截断
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        # 截断到72字节，确保不会截断在UTF-8字符中间
+        password = password_bytes[:72].decode('utf-8', errors='ignore')
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
