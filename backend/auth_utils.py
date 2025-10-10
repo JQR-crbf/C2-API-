@@ -10,7 +10,12 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30天
 
 # 使用bcrypt密码哈希算法
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# 明确指定使用bcrypt库，避免passlib的自动检测导致的72字节错误
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__ident="2b"  # 使用现代bcrypt格式，避免detect_wrap_bug检测
+)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码 - 使用更快的bcrypt算法"""
