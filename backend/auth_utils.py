@@ -9,8 +9,8 @@ SECRET_KEY = "your-secret-key-here-change-in-production"  # 生产环境需要�
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30天
 
-# 使用更快的密码哈希算法，降低复杂度以提高性能
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=4)
+# 使用bcrypt密码哈希算法
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码 - 使用更快的bcrypt算法"""
