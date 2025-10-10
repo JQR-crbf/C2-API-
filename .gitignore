@@ -105,8 +105,9 @@ Thumbs.db
 *.tar
 *.zip
 
-# Test files
-test_*.py
+# Test files - 只忽略临时测试文件，保留项目重要的测试文件
+temp_test_*.py
+debug_test_*.py
 check_*.py
 debug_*.py
 verify_*.py
