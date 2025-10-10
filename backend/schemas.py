@@ -11,7 +11,7 @@ class UserBase(BaseModel):
 class UserCreate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     email: EmailStr
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=6, max_length=50)  # 限制密码最大长度，避免bcrypt 72字节限制
     full_name: Optional[str] = None  # 兼容前端发送的full_name字段
 
 class UserLogin(BaseModel):
@@ -22,7 +22,7 @@ class UserUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     email: Optional[EmailStr] = None
     role: Optional[UserRole] = None
-    password: Optional[str] = Field(None, min_length=6)
+    password: Optional[str] = Field(None, min_length=6, max_length=50)
 
 class UserResponse(UserBase):
     id: int
