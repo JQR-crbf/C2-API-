@@ -2,11 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "regions": ["hkg1"],
-  "buildCommand": "cd ai-api-platform && npm run build",
-  "devCommand": "cd ai-api-platform && npm run dev",
-  "installCommand": "cd ai-api-platform && npm install",
-  "outputDirectory": "ai-api-platform/.next",
-  "framework": null,
   "headers": [
     {
       "source": "/(.*)",

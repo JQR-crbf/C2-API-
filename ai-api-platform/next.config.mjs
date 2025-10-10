@@ -21,8 +21,6 @@ const nextConfig = {
     }
     return []
   },
-  // 输出配置
-  output: 'standalone',
 }
 
 export default nextConfig
